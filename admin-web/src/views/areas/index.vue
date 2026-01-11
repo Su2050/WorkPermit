@@ -176,11 +176,13 @@ function handleAdd() {
   dialogVisible.value = true
 }
 
-function handleEdit(row) {
+async function handleEdit(row) {
   isEdit.value = true
   resetForm()
+  await fetchSiteOptions()  // 加载工地选项
   Object.assign(form, {
     area_id: row.area_id,
+    site_id: row.site_id || '',  // 回填工地
     name: row.name,
     code: row.code,
     description: row.description || '',
