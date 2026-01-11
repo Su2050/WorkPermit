@@ -6,18 +6,36 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装Python依赖
+# 复制依赖文件
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# 安装 Python 依赖（使用国内镜像加速）
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
 # 复制应用代码
 COPY . .
 
+# 创建启动脚本
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Waiting for database..."\n\
+sleep 5\n\
+echo "Running database migrations..."\n\
+alembic upgrade head || echo "Migration failed, continuing..."\n\
+echo "Starting application..."\n\
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
 # 暴露端口
 EXPOSE 8000
 
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8000/api/health || exit 1
+
 # 启动命令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/entrypoint.sh"]
 
