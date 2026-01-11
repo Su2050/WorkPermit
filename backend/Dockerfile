@@ -21,6 +21,7 @@ COPY . .
 # 创建启动脚本
 RUN echo '#!/bin/bash\n\
 set -e\n\
+cd /app\n\
 echo "Waiting for database..."\n\
 sleep 5\n\
 echo "Running database migrations..."\n\
