@@ -1,5 +1,6 @@
 FROM python:3.11-slim
 
+# Force rebuild - 2026-01-11-16:10
 WORKDIR /app
 
 # 安装系统依赖
