@@ -157,7 +157,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import dayjs from 'dayjs'
@@ -365,17 +365,15 @@ function initStatusChart() {
 }
 
 // 获取看板数据
-async function fetchDashboardData() {
+async function fetchDashboardStats() {
   try {
-    const response = await reportsApi.getDashboard()
+    const response = await reportsApi.getDashboardStats()
     if (response.data?.code === 0) {
       const data = response.data.data
       stats.value = data.stats || stats.value
-      pendingTickets.value = data.pendingTickets || []
-      recentAlerts.value = data.recentAlerts || []
     }
   } catch (error) {
-    console.error('Failed to fetch dashboard data:', error)
+    console.error('Failed to fetch dashboard stats:', error)
     // 使用模拟数据
     stats.value = {
       todayTasks: 5,
@@ -384,6 +382,21 @@ async function fetchDashboardData() {
       accessGrants: 145,
       syncRate: 98.5
     }
+  }
+}
+
+// 获取看板详情（列表/告警等，异步加载，不阻塞首屏）
+async function fetchDashboardDetails() {
+  try {
+    const response = await reportsApi.getDashboard()
+    if (response.data?.code === 0) {
+      const data = response.data.data
+      pendingTickets.value = data.pendingTickets || []
+      recentAlerts.value = data.recentAlerts || []
+    }
+  } catch (error) {
+    console.error('Failed to fetch dashboard details:', error)
+    // 使用模拟数据（仅列表/告警），避免首屏空白
     pendingTickets.value = [
       { id: '1', title: 'A区焊接作业', contractor: '建设集团', workerCount: 15, progress: 60, status: 'IN_PROGRESS' },
       { id: '2', title: 'B区电气施工', contractor: '电力公司', workerCount: 8, progress: 30, status: 'IN_PROGRESS' },
@@ -396,6 +409,27 @@ async function fetchDashboardData() {
   }
 }
 
+// 异步加载趋势数据（不阻塞首屏）
+async function fetchTrendData() {
+  try {
+    const days = chartRange.value === '30d' ? 30 : 7
+    const response = await reportsApi.getTrend({ metric: 'completion_rate', days })
+    if (response.data?.code !== 0) return
+    const list = response.data.data || []
+    const x = list.map(i => (i.date || '').slice(5)) // MM-DD
+    const y = list.map(i => i.value || 0)
+
+    if (trendChart) {
+      trendChart.setOption({
+        xAxis: { data: x },
+        series: [{ data: y }]
+      })
+    }
+  } catch (error) {
+    console.error('Failed to fetch trend data:', error)
+  }
+}
+
 // 窗口大小变化处理
 function handleResize() {
   trendChart?.resize()
@@ -403,16 +437,29 @@ function handleResize() {
 }
 
 onMounted(() => {
-  fetchDashboardData()
+  // 首屏只拉 stats（更快）
+  fetchDashboardStats()
+
   initTrendChart()
   initStatusChart()
   window.addEventListener('resize', handleResize)
+
+  // 列表/趋势异步加载（不阻塞首屏渲染）
+  setTimeout(() => {
+    fetchDashboardDetails()
+    fetchTrendData()
+  }, 0)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   trendChart?.dispose()
   statusChart?.dispose()
+})
+
+// 切换近7天/近30天时，异步刷新趋势数据
+watch(chartRange, () => {
+  fetchTrendData()
 })
 </script>
 

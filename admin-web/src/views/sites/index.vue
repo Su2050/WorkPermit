@@ -18,11 +18,16 @@
         <el-table-column prop="name" label="工地名称" min-width="200" />
         <el-table-column prop="code" label="工地编码" width="120" />
         <el-table-column prop="address" label="地址" min-width="200" />
-        <el-table-column prop="is_active" label="状态" width="80">
+        <el-table-column prop="is_active" label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
-              {{ row.is_active ? '启用' : '禁用' }}
-            </el-tag>
+            <el-switch
+              v-model="row.is_active"
+              inline-prompt
+              :active-text="'启用'"
+              :inactive-text="'禁用'"
+              :loading="togglingSiteId === row.site_id"
+              @change="(val) => handleToggleActive(row, val)"
+            />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
@@ -79,6 +84,17 @@
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" rows="3" placeholder="请输入工地描述（可选）" />
         </el-form-item>
+        <el-form-item v-if="isEdit" label="状态" prop="is_active">
+          <el-switch
+            v-model="form.is_active"
+            inline-prompt
+            :active-text="'启用'"
+            :inactive-text="'禁用'"
+          />
+          <div style="color: #909399; font-size: 12px; margin-top: 4px;">
+            禁用后，该工地下的下拉选项将不可选（但历史数据仍保留）
+          </div>
+        </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="默认授权开始时间" prop="default_access_start_time">
@@ -112,9 +128,6 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item v-if="isEdit" label="状态" prop="is_active">
-          <el-switch v-model="form.is_active" />
-        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -128,7 +141,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { sitesApi } from '@/api/sites'
 
@@ -141,6 +154,7 @@ const tableData = ref([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
+const togglingSiteId = ref('')
 
 const pagination = reactive({
   page: 1,
@@ -197,6 +211,31 @@ async function fetchList() {
     ElMessage.error('获取数据失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 快速启用/禁用（列表内切换）
+async function handleToggleActive(row, val) {
+  const prev = !val
+  try {
+    togglingSiteId.value = row.site_id
+    await ElMessageBox.confirm(
+      `确定要将工地「${row.name}」设置为${val ? '启用' : '禁用'}吗？`,
+      '确认操作',
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+    )
+    const resp = await sitesApi.update(row.site_id, { is_active: val })
+    if (resp.data?.code === 0) {
+      ElMessage.success('状态已更新')
+    } else {
+      row.is_active = prev
+      ElMessage.error(resp.data?.message || '状态更新失败')
+    }
+  } catch (e) {
+    // 取消/失败都回滚 UI 状态
+    row.is_active = prev
+  } finally {
+    togglingSiteId.value = ''
   }
 }
 
@@ -266,9 +305,29 @@ async function handleSubmit() {
     try {
       let response
       if (isEdit.value) {
-        response = await sitesApi.update(form.site_id, form)
+        // 只提交后端允许的更新字段，避免 422（例如 code/site_id 这类后端不接收）
+        const payload = {
+          name: form.name,
+          address: form.address,
+          description: form.description,
+          default_access_start_time: form.default_access_start_time,
+          default_access_end_time: form.default_access_end_time,
+          default_training_deadline: form.default_training_deadline,
+          is_active: form.is_active
+        }
+        response = await sitesApi.update(form.site_id, payload)
       } else {
-        response = await sitesApi.create(form)
+        // 创建接口不支持 is_active（默认启用），只提交创建所需字段
+        const payload = {
+          name: form.name,
+          code: form.code,
+          address: form.address,
+          description: form.description,
+          default_access_start_time: form.default_access_start_time,
+          default_access_end_time: form.default_access_end_time,
+          default_training_deadline: form.default_training_deadline
+        }
+        response = await sitesApi.create(payload)
       }
       
       if (response.data?.code === 0) {

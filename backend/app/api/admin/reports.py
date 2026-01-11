@@ -5,6 +5,9 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 from io import BytesIO
 import uuid
+import json
+import hashlib
+import logging
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -14,6 +17,7 @@ from sqlalchemy.orm import selectinload
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models import (
     WorkTicket, DailyTicket, DailyTicketWorker, 
@@ -25,6 +29,42 @@ from app.middleware.tenant import get_tenant_context, TenantQueryFilter
 from app.utils.response import success_response
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
+
+try:
+    import redis.asyncio as redis_async  # type: ignore
+except Exception:  # pragma: no cover
+    redis_async = None
+
+_redis_client = None
+
+
+async def _get_redis_client():
+    global _redis_client
+    if redis_async is None:
+        return None
+    if _redis_client is None:
+        _redis_client = redis_async.from_url(
+            settings.REDIS_URL, encoding="utf-8", decode_responses=True
+        )
+    return _redis_client
+
+
+def _build_dashboard_cache_key(ctx, today: date) -> str:
+    role = getattr(ctx, "user_role", None) or "unknown"
+    if ctx is None:
+        scope = "anonymous"
+    elif getattr(ctx, "is_sys_admin", False):
+        scope = "all"
+    else:
+        sites = getattr(ctx, "accessible_sites", None) or []
+        if sites:
+            raw = ",".join(sorted(str(s) for s in sites))
+            scope = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+        else:
+            scope = "none"
+    return f"dashboard:v1:{today.isoformat()}:{role}:{scope}"
 
 
 @router.get("/dashboard")
@@ -39,6 +79,17 @@ async def get_dashboard(
     """
     ctx = get_tenant_context()
     today = date.today()
+
+    # 轻量缓存：避免每次进入Dashboard都打多条聚合SQL（TTL=60s）
+    redis_client = await _get_redis_client()
+    cache_key = _build_dashboard_cache_key(ctx, today)
+    if redis_client is not None:
+        try:
+            cached = await redis_client.get(cache_key)
+            if cached:
+                return success_response(json.loads(cached))
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"Dashboard cache read failed: {e}")
     
     # 今日作业票统计
     stmt = select(func.count(DailyTicket.daily_ticket_id)).where(
@@ -50,11 +101,12 @@ async def get_dashboard(
     today_tickets = today_tickets_result.scalar() or 0
     
     # 今日培训统计
-    stmt = select(func.count(DailyTicketWorker.id)).where(
-        DailyTicketWorker.training_status == "COMPLETED"
-    ).join(DailyTicket).where(
+    stmt = select(func.count(DailyTicketWorker.id)).join(DailyTicket).where(
+        DailyTicketWorker.training_status == "COMPLETED",
         DailyTicket.date == today
     )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
     completed_training_result = await db.execute(stmt)
     completed_training = completed_training_result.scalar() or 0
     
@@ -62,6 +114,8 @@ async def get_dashboard(
         DailyTicket.date == today,
         DailyTicketWorker.status == "ACTIVE"
     )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
     total_training_result = await db.execute(stmt)
     total_training = total_training_result.scalar() or 0
     
@@ -70,6 +124,8 @@ async def get_dashboard(
         DailyTicket.date == today,
         AccessGrant.status == "SYNCED"
     )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
     synced_grants_result = await db.execute(stmt)
     synced_grants = synced_grants_result.scalar() or 0
     
@@ -77,6 +133,8 @@ async def get_dashboard(
         DailyTicket.date == today,
         AccessGrant.status.in_(["PENDING_SYNC", "SYNC_FAILED"])
     )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
     pending_grants_result = await db.execute(stmt)
     pending_grants = pending_grants_result.scalar() or 0
     
@@ -89,6 +147,7 @@ async def get_dashboard(
         AccessEvent.event_time <= today_end,
         AccessEvent.result == "PASS"
     )
+    stmt = TenantQueryFilter.apply(stmt, ctx)
     pass_events_result = await db.execute(stmt)
     pass_events = pass_events_result.scalar() or 0
     
@@ -97,6 +156,7 @@ async def get_dashboard(
         AccessEvent.event_time <= today_end,
         AccessEvent.result == "DENY"
     )
+    stmt = TenantQueryFilter.apply(stmt, ctx)
     deny_events_result = await db.execute(stmt)
     deny_events = deny_events_result.scalar() or 0
     
@@ -120,22 +180,46 @@ async def get_dashboard(
     ).order_by(WorkTicket.created_at.desc()).limit(5)
     stmt = TenantQueryFilter.apply(stmt, ctx)
     pending_tickets_result = await db.execute(stmt)
-    pending_tickets_list = []
-    for ticket in pending_tickets_result.scalars().all():
-        # 计算培训进度
-        stmt_progress = select(
-            func.count(DailyTicketWorker.id),
-            func.sum(cast(DailyTicketWorker.completed_video_count, Integer))
-        ).join(DailyTicket).where(
-            DailyTicket.ticket_id == ticket.ticket_id,
-            DailyTicket.date == today,
-            DailyTicketWorker.status == "ACTIVE"
+    pending_tickets = pending_tickets_result.scalars().all()
+
+    # 优化：进度统计由 N+1 查询改成一次聚合查询
+    progress_map: dict[str, dict] = {}
+    ticket_ids = [t.ticket_id for t in pending_tickets]
+    if ticket_ids:
+        stmt_progress = (
+            select(
+                DailyTicket.ticket_id,
+                func.count(DailyTicketWorker.id),
+                func.sum(cast(DailyTicketWorker.completed_video_count, Integer)),
+                func.sum(cast(DailyTicketWorker.total_video_count, Integer)),
+            )
+            .join(DailyTicket, DailyTicketWorker.daily_ticket_id == DailyTicket.daily_ticket_id)
+            .where(
+                DailyTicket.date == today,
+                DailyTicket.ticket_id.in_(ticket_ids),
+                DailyTicketWorker.status == "ACTIVE",
+            )
+            .group_by(DailyTicket.ticket_id)
         )
+        if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+            stmt_progress = stmt_progress.where(DailyTicket.site_id.in_(ctx.accessible_sites))
         progress_result = await db.execute(stmt_progress)
-        progress_row = progress_result.first()
-        total_workers = progress_row[0] or 0
-        total_completed = progress_row[1] or 0
-        total_videos = total_workers * 3  # 假设每个作业票3个视频
+        for tid, worker_cnt, completed_sum, total_sum in progress_result.all():
+            progress_map[str(tid)] = {
+                "workers": worker_cnt or 0,
+                "completed": completed_sum or 0,
+                "total": total_sum or 0,
+            }
+
+    pending_tickets_list = []
+    for ticket in pending_tickets:
+        prog = progress_map.get(str(ticket.ticket_id), {"workers": 0, "completed": 0, "total": 0})
+        total_workers = prog["workers"]
+        total_completed = prog["completed"]
+        total_videos = prog["total"] or 0
+        # 兼容历史数据（若 total_video_count 未填）
+        if not total_videos:
+            total_videos = total_workers * 3
         progress = round(total_completed / total_videos * 100, 0) if total_videos > 0 else 0
         
         pending_tickets_list.append({
@@ -147,7 +231,7 @@ async def get_dashboard(
             "status": ticket.status
         })
     
-    return success_response({
+    payload = {
         "stats": {
             "todayTasks": today_tickets,
             "activeTickets": active_tickets,
@@ -157,7 +241,107 @@ async def get_dashboard(
         },
         "pendingTickets": pending_tickets_list,
         "recentAlerts": []  # 暂时返回空数组，后续可以添加告警数据
-    })
+    }
+
+    if redis_client is not None:
+        try:
+            await redis_client.set(cache_key, json.dumps(payload, ensure_ascii=False), ex=60)
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"Dashboard cache write failed: {e}")
+
+    return success_response(payload)
+
+
+@router.get("/dashboard/stats")
+async def get_dashboard_stats(
+    current_user: SysUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取看板首屏统计（轻量）
+    - 只返回 stats（用于首屏4张卡片）
+    - 更适合强缓存/快速返回
+    """
+    ctx = get_tenant_context()
+    today = date.today()
+
+    redis_client = await _get_redis_client()
+    cache_key = _build_dashboard_cache_key(ctx, today) + ":stats"
+    if redis_client is not None:
+        try:
+            cached = await redis_client.get(cache_key)
+            if cached:
+                return success_response(json.loads(cached))
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"Dashboard stats cache read failed: {e}")
+
+    # 今日作业票统计（今日日票）
+    stmt = select(func.count(DailyTicket.daily_ticket_id)).where(
+        DailyTicket.date == today,
+        DailyTicket.status.in_(["PUBLISHED", "IN_PROGRESS"])
+    )
+    stmt = TenantQueryFilter.apply(stmt, ctx)
+    today_tickets_result = await db.execute(stmt)
+    today_tickets = today_tickets_result.scalar() or 0
+
+    # 今日培训完成数（完成的人员条目数）
+    stmt = select(func.count(DailyTicketWorker.id)).join(DailyTicket).where(
+        DailyTicketWorker.training_status == "COMPLETED",
+        DailyTicket.date == today
+    )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
+    completed_training_result = await db.execute(stmt)
+    completed_training = completed_training_result.scalar() or 0
+
+    # 今日授权数（已同步）
+    stmt = select(func.count(AccessGrant.grant_id)).join(DailyTicket).where(
+        DailyTicket.date == today,
+        AccessGrant.status == "SYNCED"
+    )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
+    synced_grants_result = await db.execute(stmt)
+    synced_grants = synced_grants_result.scalar() or 0
+
+    # 计算同步率需要分母（同步+待同步/失败）
+    stmt = select(func.count(AccessGrant.grant_id)).join(DailyTicket).where(
+        DailyTicket.date == today,
+        AccessGrant.status.in_(["PENDING_SYNC", "SYNC_FAILED"])
+    )
+    if ctx is not None and not ctx.is_sys_admin and ctx.accessible_sites:
+        stmt = stmt.where(DailyTicket.site_id.in_(ctx.accessible_sites))
+    pending_grants_result = await db.execute(stmt)
+    pending_grants = pending_grants_result.scalar() or 0
+
+    total_grants = synced_grants + pending_grants
+    sync_rate = round(synced_grants / total_grants * 100, 1) if total_grants > 0 else 0
+
+    # 进行中的作业票数量
+    stmt = select(func.count(WorkTicket.ticket_id)).where(
+        WorkTicket.status == "IN_PROGRESS"
+    )
+    stmt = TenantQueryFilter.apply(stmt, ctx)
+    active_tickets_result = await db.execute(stmt)
+    active_tickets = active_tickets_result.scalar() or 0
+
+    payload = {
+        "stats": {
+            "todayTasks": today_tickets,
+            "activeTickets": active_tickets,
+            "todayTrainings": completed_training,
+            "accessGrants": synced_grants,
+            "syncRate": sync_rate
+        }
+    }
+
+    if redis_client is not None:
+        try:
+            await redis_client.set(cache_key, json.dumps(payload, ensure_ascii=False), ex=60)
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"Dashboard stats cache write failed: {e}")
+
+    return success_response(payload)
 
 
 @router.get("/reconciliation")

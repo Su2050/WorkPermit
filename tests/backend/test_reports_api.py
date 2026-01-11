@@ -88,6 +88,17 @@ class TestDashboard:
         data = resp.json()
         assert data.get("code") == 0
         print("✓ 获取Dashboard统计成功")
+
+    def test_dashboard_stats_basic(self, client):
+        """测试：获取Dashboard首屏统计（仅stats）"""
+        resp = client.get("/reports/dashboard/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data.get("code") == 0
+        payload = data.get("data") or {}
+        assert "stats" in payload
+        assert isinstance(payload["stats"], dict)
+        print("✓ 获取Dashboard stats 成功")
     
     def test_dashboard_today_tasks(self, client):
         """测试：今日任务数"""

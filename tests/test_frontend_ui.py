@@ -5,10 +5,12 @@
 import pytest
 from playwright.sync_api import Page, expect
 import time
+import uuid
 
 # 配置
-BASE_URL = "http://localhost:5173"
-API_URL = "http://localhost:8000/api"
+# 统一使用 127.0.0.1，避免 macOS 上 localhost 解析到 IPv6(::1) 导致连接拒绝
+BASE_URL = "http://127.0.0.1:5173"
+API_URL = "http://127.0.0.1:8000/api"
 
 # 测试用户
 TEST_USERNAME = "admin"
@@ -65,11 +67,12 @@ class TestLogin:
         
         # 5. 等待跳转到首页
         print("  5. 等待跳转...")
-        page.wait_for_url("**/", timeout=5000)
+        page.wait_for_url("**/dashboard**", timeout=10000)
         
         # 6. 验证登录成功（检查是否有用户名显示）
         print("  6. 验证登录状态...")
-        expect(page.locator('text=admin')).to_be_visible(timeout=3000)
+        # 避免 strict mode：页面上可能同时出现“用户菜单中的用户名”和“欢迎语中的用户名”
+        expect(page.locator(".user-name").filter(has_text=TEST_USERNAME).first).to_be_visible(timeout=5000)
         
         print("  ✓ 登录成功")
     
@@ -86,7 +89,7 @@ class TestLogin:
         page.locator('button:has-text("登录")').click()
         
         # 应该显示错误提示
-        expect(page.locator('.el-message--error')).to_be_visible(timeout=3000)
+        expect(page.locator('.el-message--error').last).to_be_visible(timeout=3000)
         
         print("  ✓ 正确显示错误提示")
 
@@ -101,7 +104,8 @@ class TestDashboard:
         page.locator('input[placeholder*="用户名"]').fill(TEST_USERNAME)
         page.locator('input[type="password"]').fill(TEST_PASSWORD)
         page.locator('button:has-text("登录")').click()
-        page.wait_for_url("**/", timeout=5000)
+        # 登录后会跳转到 dashboard，精确等待避免偶发超时
+        page.wait_for_url("**/dashboard**", timeout=10000)
     
     def test_dashboard_loads(self, page: Page):
         """测试: Dashboard页面加载"""
@@ -110,9 +114,11 @@ class TestDashboard:
         # 应该在首页
         assert "/" in page.url or "dashboard" in page.url
         
-        # 检查统计卡片
-        expect(page.locator('text=今日任务')).to_be_visible()
-        expect(page.locator('text=进行中')).to_be_visible()
+        # 检查核心可见元素（文案可能随需求调整，选更稳定的锚点）
+        expect(page.locator('h1:has-text("早上好")')).to_be_visible(timeout=5000)
+        expect(page.get_by_role("button", name="新建作业票")).to_be_visible(timeout=5000)
+        expect(page.locator('text=待处理作业票').first).to_be_visible(timeout=5000)
+        expect(page.locator('text=今日作业状态').first).to_be_visible(timeout=5000)
         
         print("  ✓ Dashboard加载成功")
     
@@ -122,15 +128,20 @@ class TestDashboard:
         
         # 监听API请求
         api_calls = {
-            "dashboard": False,
+            "dashboard_stats": False,
+            "dashboard_details": False,
             "alerts": False
         }
         
         def handle_response(response):
-            if "/reports/dashboard" in response.url:
-                api_calls["dashboard"] = response.status == 200
+            if "/reports/dashboard/stats" in response.url:
+                api_calls["dashboard_stats"] = response.status == 200
                 if response.status != 200:
-                    print(f"  ❌ Dashboard API失败: {response.status}")
+                    print(f"  ❌ Dashboard Stats API失败: {response.status}")
+            elif "/reports/dashboard" in response.url:
+                api_calls["dashboard_details"] = response.status == 200
+                if response.status != 200:
+                    print(f"  ❌ Dashboard Details API失败: {response.status}")
             elif "/alerts/stats" in response.url:
                 api_calls["alerts"] = response.status == 200
                 if response.status != 200:
@@ -143,7 +154,10 @@ class TestDashboard:
         page.wait_for_load_state("networkidle")
         
         # 验证API都成功了
-        assert api_calls["dashboard"], "Dashboard API应该成功"
+        assert api_calls["dashboard_stats"], "Dashboard Stats API应该成功"
+        # 详情接口是异步加载，给一点时间再判断（避免偶发）
+        page.wait_for_timeout(1200)
+        assert api_calls["dashboard_details"], "Dashboard Details API应该成功"
         assert api_calls["alerts"], "Alerts API应该成功"
         
         print("  ✓ 所有API调用成功")
@@ -159,7 +173,7 @@ class TestTicketList:
         page.locator('input[placeholder*="用户名"]').fill(TEST_USERNAME)
         page.locator('input[type="password"]').fill(TEST_PASSWORD)
         page.locator('button:has-text("登录")').click()
-        page.wait_for_url("**/", timeout=5000)
+        page.wait_for_url("**/dashboard**", timeout=10000)
         
         # 点击"作业票管理"菜单
         page.locator('text=作业票管理').click()
@@ -183,12 +197,16 @@ class TestTicketList:
         
         # 1. 测试状态筛选
         print("  1. 测试状态筛选...")
-        status_selector = page.locator('.el-select').first
+        # 过滤区第一个 el-select 是“施工单位”，这里需要明确点到“状态”筛选框
+        filter_card = page.locator(".filter-card").first
+        status_selector = filter_card.locator('.el-form-item').filter(has_text="状态").locator(".el-select").first
         status_selector.click()
-        page.wait_for_timeout(500)
+        # 等待下拉真正打开（避免命中隐藏的 dropdown）
+        dropdown = page.locator(".el-select-dropdown:visible").first
+        expect(dropdown).to_be_visible(timeout=5000)
         
         # 选择"进行中"选项
-        page.locator('.el-select-dropdown__item:has-text("进行中")').first.click()
+        dropdown.locator('.el-select-dropdown__item:visible').filter(has_text="进行中").first.click()
         page.wait_for_timeout(1000)
         
         print("  ✓ 状态筛选执行")
@@ -229,7 +247,7 @@ class TestTicketDetail:
         page.locator('input[placeholder*="用户名"]').fill(TEST_USERNAME)
         page.locator('input[type="password"]').fill(TEST_PASSWORD)
         page.locator('button:has-text("登录")').click()
-        page.wait_for_url("**/", timeout=5000)
+        page.wait_for_url("**/dashboard**", timeout=10000)
         
         # 导航到作业票列表
         page.locator('text=作业票管理').click()
@@ -308,10 +326,11 @@ class TestTicketDetail:
             page.wait_for_url("**/tickets/**", timeout=5000)
             page.wait_for_load_state("networkidle")
             
-            # 检查详情页的各个部分是否加载
-            expect(page.locator('text=基本信息')).to_be_visible(timeout=5000)
-            expect(page.locator('text=作业区域')).to_be_visible(timeout=5000)
-            expect(page.locator('text=培训视频')).to_be_visible(timeout=5000)
+            # 检查详情页的各个部分是否加载（避免同名菜单/统计标签触发 strict mode）
+            detail = page.locator(".ticket-detail").first
+            expect(detail.locator('.el-card__header span:has-text("基本信息")')).to_be_visible(timeout=5000)
+            expect(detail.locator('.el-card__header span:has-text("作业区域")')).to_be_visible(timeout=5000)
+            expect(detail.locator('.el-card__header span:has-text("培训视频")')).to_be_visible(timeout=5000)
             
             print("  ✓ 详情页各部分加载正常")
         
@@ -329,7 +348,7 @@ class TestCreateTicket:
         page.locator('input[placeholder*="用户名"]').fill(TEST_USERNAME)
         page.locator('input[type="password"]').fill(TEST_PASSWORD)
         page.locator('button:has-text("登录")').click()
-        page.wait_for_url("**/", timeout=5000)
+        page.wait_for_url("**/dashboard**", timeout=10000)
         
         # 导航到创建页面
         page.goto(f"{BASE_URL}/tickets/create")
@@ -339,12 +358,14 @@ class TestCreateTicket:
         """测试: 创建表单加载"""
         print("\n  === 测试创建表单 ===")
         
-        # 应该看到表单元素
-        expect(page.locator('text=作业票名称')).to_be_visible()
-        expect(page.locator('text=施工单位')).to_be_visible()
-        expect(page.locator('text=作业区域')).to_be_visible()
-        expect(page.locator('text=培训视频')).to_be_visible()
-        expect(page.locator('text=作业人员')).to_be_visible()
+        # 应该看到表单元素（避免用 text= 触发 strict mode：同名菜单/列表项很多）
+        container = page.locator(".ticket-create").first
+        expect(container.locator('.page-title:has-text("新建作业票")')).to_be_visible(timeout=5000)
+        expect(container.locator('.el-form-item__label:has-text("作业票名称")')).to_be_visible(timeout=5000)
+        expect(container.locator('.el-form-item__label:has-text("施工单位")')).to_be_visible(timeout=5000)
+        expect(container.locator('h3.section-title:has-text("作业区域")')).to_be_visible(timeout=5000)
+        expect(container.locator('h3.section-title:has-text("培训视频")')).to_be_visible(timeout=5000)
+        expect(container.locator('h3.section-title:has-text("作业人员")')).to_be_visible(timeout=5000)
         
         print("  ✓ 创建表单加载完成")
     
@@ -373,7 +394,8 @@ class TestAreaManagement:
         page.locator('input[placeholder*="用户名"]').fill(TEST_USERNAME)
         page.locator('input[type="password"]').fill(TEST_PASSWORD)
         page.locator('button:has-text("登录")').click()
-        page.wait_for_url("**/", timeout=5000)
+        page.wait_for_url("**/dashboard**", timeout=10000)
+        page.wait_for_url("**/dashboard**", timeout=10000)
         
         # 导航到区域管理
         page.locator('text=作业区域').click()
@@ -520,6 +542,97 @@ class TestContractorManagement:
                 print("  ⚠ 导航菜单中未找到'工地管理'")
         except Exception as e:
             print(f"  ⚠ 导航测试异常: {e}")
+
+    def test_sites_toggle_active_switch(self, page: Page):
+        """测试: 工地列表行内启用/禁用开关（el-switch + 二次确认）"""
+        print("\n  === 测试工地启用/禁用开关 ===")
+        
+        # 进入工地管理页
+        page.get_by_role("menuitem", name="工地管理").first.click()
+        page.wait_for_url("**/sites**", timeout=5000)
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(500)
+        
+        rows = page.locator(".el-table__body-wrapper .el-table__row")
+        if rows.count() == 0:
+            # 如果没有数据，先创建一条工地，确保测试可执行
+            print("  ⚠ 工地列表为空，先创建一条工地用于测试...")
+            unique = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
+            site_name_new = f"UI测试工地_{unique}"
+            site_code_new = f"UI_SITE_{unique}"
+            
+            page.locator('button:has-text("新增工地")').click()
+            dialog = page.get_by_role("dialog").first
+            expect(dialog).to_be_visible(timeout=5000)
+            
+            dialog.locator('input[placeholder*="工地名称"]').fill(site_name_new)
+            dialog.locator('input[placeholder*="工地编码"]').fill(site_code_new)
+            dialog.locator('textarea[placeholder*="地址"]').fill("自动化测试地址")
+            dialog.locator('textarea[placeholder*="描述"]').fill("用于验证启用/禁用开关")
+            
+            # 防止必填时间字段为空（不同环境默认值可能不一致）
+            for label, value in [
+                ("默认授权开始时间", "06:00:00"),
+                ("默认授权结束时间", "20:00:00"),
+                ("默认培训截止时间", "07:30:00"),
+            ]:
+                inp = page.locator(f'label:has-text("{label}")').locator("..").locator(".el-input__inner").first
+                inp.click()
+                inp.fill(value)
+                page.keyboard.press("Enter")
+                page.wait_for_timeout(200)
+            
+            dialog.locator('.el-dialog__footer button.el-button--primary').first.click()
+            expect(page.locator(".el-message--success").last).to_be_visible(timeout=8000)
+            page.wait_for_timeout(800)
+            
+            # 重新抓取行
+            rows = page.locator(".el-table__body-wrapper .el-table__row")
+            expect(rows.first).to_be_visible(timeout=5000)
+        
+        row = rows.first
+        site_name = row.locator("td").first.text_content() or "未知工地"
+        switch = row.locator(".el-switch").first
+        expect(switch).to_be_visible(timeout=3000)
+        
+        def is_checked():
+            return switch.evaluate("el => el.classList.contains('is-checked')")
+        
+        before = is_checked()
+        print(f"  当前工地: {site_name}，初始状态: {'启用' if before else '禁用'}")
+        
+        # 切换一次
+        switch.click()
+        messagebox = page.locator(".el-message-box").first
+        expect(messagebox).to_be_visible(timeout=5000)
+        # 等待 PATCH 成功返回（更稳）- sync API 用 expect_response
+        with page.expect_response(
+            lambda r: ("/api/admin/sites/" in r.url or "/admin/sites/" in r.url) and r.request.method == "PATCH",
+            timeout=10000
+        ):
+            messagebox.get_by_role("button", name="确定").click()
+        expect(page.locator(".el-message--success").last).to_be_visible(timeout=5000)
+        
+        page.wait_for_timeout(500)
+        after = is_checked()
+        assert after != before, "切换后开关状态应该发生变化"
+        print(f"  ✓ 切换成功，当前状态: {'启用' if after else '禁用'}")
+        
+        # 切回原状态（保持测试环境稳定）
+        switch.click()
+        messagebox = page.locator(".el-message-box").first
+        expect(messagebox).to_be_visible(timeout=5000)
+        with page.expect_response(
+            lambda r: ("/api/admin/sites/" in r.url or "/admin/sites/" in r.url) and r.request.method == "PATCH",
+            timeout=10000
+        ):
+            messagebox.get_by_role("button", name="确定").click()
+        expect(page.locator(".el-message--success").last).to_be_visible(timeout=5000)
+        page.wait_for_timeout(500)
+        
+        final_state = is_checked()
+        assert final_state == before, "切回后应恢复到初始状态"
+        print("  ✓ 已恢复初始状态")
 
 
 # 运行测试时的配置

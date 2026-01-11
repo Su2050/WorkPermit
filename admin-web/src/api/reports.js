@@ -5,6 +5,11 @@ export const reportsApi = {
   getDashboard(params) {
     return request.get('/admin/reports/dashboard', { params })
   },
+
+  // 获取看板首屏统计（仅stats，用于首屏快速渲染）
+  getDashboardStats(params) {
+    return request.get('/admin/reports/dashboard/stats', { params })
+  },
   
   // 获取培训统计
   getTrainingStats(params) {
