@@ -24,8 +24,9 @@
           router
           class="sidebar-menu"
         >
-          <template v-for="route in menuRoutes" :key="route.path">
-            <el-menu-item :index="route.path">
+          <template v-for="route in menuRoutes" :key="route.fullPath">
+            <!-- 注意：index 必须是绝对路径，否则会在 /tickets/:id 下被拼成 /tickets/sites 这类错误路由 -->
+            <el-menu-item :index="route.fullPath">
               <el-icon>
                 <component :is="route.meta.icon" />
               </el-icon>
@@ -168,7 +169,13 @@ const roleLabel = computed(() => {
 // 菜单路由
 const menuRoutes = computed(() => {
   const allRoutes = router.options.routes.find(r => r.path === '/')?.children || []
-  return allRoutes.filter(r => !r.meta?.hidden)
+  return allRoutes
+    .filter(r => !r.meta?.hidden)
+    .map(r => ({
+      ...r,
+      // children 路由在 router 中是相对 path（如 "sites"），菜单必须使用绝对 path（如 "/sites"）
+      fullPath: r.path?.startsWith('/') ? r.path : `/${r.path}`
+    }))
 })
 
 // 缓存的视图

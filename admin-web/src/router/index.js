@@ -34,13 +34,13 @@ const routes = [
         path: 'tickets/create',
         name: 'TicketCreate',
         component: () => import('@/views/tickets/create.vue'),
-        meta: { title: '新建作业票', hidden: true }
+        meta: { title: '新建作业票', hidden: true, activeMenu: '/tickets' }
       },
       {
         path: 'tickets/:id',
         name: 'TicketDetail',
         component: () => import('@/views/tickets/detail.vue'),
-        meta: { title: '作业票详情', hidden: true }
+        meta: { title: '作业票详情', hidden: true, activeMenu: '/tickets' }
       },
       // 基础数据
       {
@@ -53,7 +53,7 @@ const routes = [
         path: 'sites/:id',
         name: 'SiteDetail',
         component: () => import('@/views/sites/detail.vue'),
-        meta: { title: '工地详情', hidden: true }
+        meta: { title: '工地详情', hidden: true, activeMenu: '/sites' }
       },
       {
         path: 'areas',
