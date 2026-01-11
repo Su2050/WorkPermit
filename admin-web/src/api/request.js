@@ -59,8 +59,16 @@ request.interceptors.response.use(
         return Promise.reject(new Error(res.message || '无权限'))
       }
       
-      // 其他错误
-      ElMessage.error(res.message || '请求失败')
+      // 其他错误 - 优先显示详细错误信息（如果有）
+      let errorMessage = res.message || '请求失败'
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        // 如果有详细错误列表，显示第一个错误的具体信息
+        const firstError = res.data[0]
+        if (firstError.message) {
+          errorMessage = firstError.message
+        }
+      }
+      ElMessage.error(errorMessage)
       return Promise.reject(new Error(res.message))
     }
     
