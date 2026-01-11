@@ -271,9 +271,9 @@
             >
               <el-option
                 v-for="w in currentTicket?.workers || []"
-                :key="w.id"
+                :key="w.worker_id"
                 :label="w.name"
-                :value="w.id"
+                :value="w.worker_id"
                 :disabled="w.completedToday"
               >
                 {{ w.name }}
@@ -309,9 +309,9 @@
             >
               <el-option
                 v-for="a in currentTicket?.areas || []"
-                :key="a.id"
+                :key="a.area_id"
                 :label="a.name"
-                :value="a.id"
+                :value="a.area_id"
                 :disabled="a.hasGrantToday"
               >
                 {{ a.name }}
@@ -522,7 +522,6 @@ function handleSortChange({ prop, order }) {
 
 // 编辑/变更
 async function handleEdit(row) {
-  currentTicket.value = row
   changeForm.changeType = 'workers'
   changeForm.addWorkers = []
   changeForm.removeWorkers = []
@@ -533,11 +532,23 @@ async function handleEdit(row) {
   changeForm.reason = ''
   changeDialogVisible.value = true
   
-  // 加载人员和区域选项
-  await Promise.all([
-    fetchWorkerOptions(),
-    fetchAreaOptions()
-  ])
+  // 获取作业票详情（包含workers/areas/videos）和选项数据
+  try {
+    const [detailRes] = await Promise.all([
+      ticketsApi.getDetail(row.ticket_id),
+      fetchWorkerOptions(),
+      fetchAreaOptions()
+    ])
+    
+    if (detailRes.data?.code === 0) {
+      currentTicket.value = detailRes.data.data
+    } else {
+      currentTicket.value = row  // 降级为列表数据
+    }
+  } catch (error) {
+    console.error('Failed to fetch ticket detail:', error)
+    currentTicket.value = row
+  }
 }
 
 // 提交变更
