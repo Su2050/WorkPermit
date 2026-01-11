@@ -93,6 +93,70 @@ pytest frontend/test_login_ui.py -v
 pytest integration/ -v
 ```
 
+#### 运行端到端（E2E）业务流程测试
+
+E2E测试模拟完整业务流程：登录 -> 创建工地 -> 创建施工单位 -> 创建作业区域 -> 创建培训视频 -> 创建人员 -> 创建工作票
+
+**方式1：使用自动化脚本（推荐，Mac）**
+```bash
+# 全自动运行（自动检查服务状态、等待服务就绪、显示浏览器）
+chmod +x ../scripts/run_e2e_auto.sh
+../scripts/run_e2e_auto.sh
+
+# 快速运行（简化版，跳过服务检查）
+chmod +x ../scripts/run_e2e.sh
+../scripts/run_e2e.sh
+```
+
+**方式2：使用Makefile命令（推荐）**
+```bash
+# 可视化模式（显示浏览器，适合开发调试）
+cd .. && make e2e
+
+# 无头模式（不显示浏览器，适合CI/CD，更快）
+cd .. && make e2e-headless
+
+# 运行并清理测试数据
+cd .. && make e2e-cleanup
+
+# 查看所有可用命令
+cd .. && make help
+```
+
+**方式3：直接使用pytest**
+```bash
+# 显示浏览器（默认，可视化模式）
+SHOW_BROWSER=true pytest test_e2e_business_workflow.py -v -s
+
+# 不显示浏览器（无头模式，更快）
+SHOW_BROWSER=false pytest test_e2e_business_workflow.py -v -s
+
+# 调整操作速度（毫秒，默认500）
+SLOW_MO=200 pytest test_e2e_business_workflow.py -v -s
+
+# 运行并清理测试数据
+pytest test_e2e_business_workflow.py -v -s --cleanup
+```
+
+**环境变量配置：**
+- `SHOW_BROWSER`: 是否显示浏览器窗口（默认: `true`）
+  - `true`: 可视化模式，显示浏览器窗口，适合开发调试
+  - `false`: 无头模式，不显示浏览器，适合CI/CD，运行速度更快
+- `SLOW_MO`: 操作延迟时间，单位毫秒（默认: `500`，范围: `100-1000`）
+  - 值越大，操作越慢，越容易观察测试过程
+  - 建议开发时使用500-800ms，CI/CD时使用100-200ms
+- `BASE_URL`: 前端服务地址（默认: `http://localhost:5173`）
+- `API_URL`: 后端API地址（默认: `http://localhost:8000/api`）
+
+**注意事项：**
+- ✅ 需要前端服务运行在 `http://localhost:5173`
+- ✅ 需要后端服务运行在 `http://localhost:8000`
+- ✅ 首次运行需安装Playwright浏览器：`playwright install chromium`
+- ✅ Mac Terminal需要允许运行脚本权限
+- ⚠️ 自动化脚本会自动检查服务状态，如服务未启动会提示并退出
+- ⚠️ E2E测试会创建测试数据，建议在开发环境中运行
+- 💡 推荐使用 `run_e2e_auto.sh` 脚本，它会自动处理所有前置检查
+
 #### 运行性能测试
 ```bash
 pytest test_performance.py -v

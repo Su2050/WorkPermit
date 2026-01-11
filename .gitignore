@@ -23,7 +23,9 @@ build/
 
 # Logs
 *.log
+*.log.gz
 logs/
+tests/临时的logs/
 
 # Test
 .pytest_cache/

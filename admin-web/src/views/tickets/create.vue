@@ -48,6 +48,7 @@
                   start-placeholder="开始日期"
                   end-placeholder="结束日期"
                   value-format="YYYY-MM-DD"
+                  :shortcuts="dateRangeShortcuts"
                   :disabled-date="disabledDate"
                 />
               </el-form-item>
@@ -102,7 +103,9 @@
           <h3 class="section-title">作业区域</h3>
           
           <el-form-item label="选择区域" prop="areaIds">
+            <div class="select-with-close">
             <el-select
+                ref="areaSelectRef"
               v-model="form.areaIds"
               multiple
               filterable
@@ -121,6 +124,15 @@
                 </span>
               </el-option>
             </el-select>
+
+              <el-button
+                class="select-close-btn"
+                type="default"
+                @click="areaSelectRef?.blur?.()"
+              >
+                收起
+              </el-button>
+            </div>
           </el-form-item>
           
           <!-- 已选区域列表 -->
@@ -141,7 +153,9 @@
           <h3 class="section-title">培训视频</h3>
           
           <el-form-item label="选择视频" prop="videoIds">
+            <div class="select-with-close">
             <el-select
+                ref="videoSelectRef"
               v-model="form.videoIds"
               multiple
               filterable
@@ -160,6 +174,15 @@
                 </span>
               </el-option>
             </el-select>
+
+              <el-button
+                class="select-close-btn"
+                type="default"
+                @click="videoSelectRef?.blur?.()"
+              >
+                收起
+              </el-button>
+            </div>
           </el-form-item>
           
           <!-- 已选视频列表 -->
@@ -187,7 +210,9 @@
           </h3>
           
           <el-form-item label="选择人员" prop="workerIds">
+            <div class="select-with-close">
             <el-select
+                ref="workerSelectRef"
               v-model="form.workerIds"
               multiple
               filterable
@@ -209,6 +234,15 @@
                 </span>
               </el-option>
             </el-select>
+
+              <el-button
+                class="select-close-btn"
+                type="default"
+                @click="workerSelectRef?.blur?.()"
+              >
+                收起
+              </el-button>
+            </div>
           </el-form-item>
           
           <!-- 已选人员列表 -->
@@ -261,6 +295,11 @@ import { areasApi } from '@/api/areas'
 import { videosApi } from '@/api/videos'
 import { workersApi } from '@/api/workers'
 import { contractorsApi } from '@/api/contractors'
+
+// refs：用于手动收起下拉框（blur）
+const areaSelectRef = ref()
+const videoSelectRef = ref()
+const workerSelectRef = ref()
 
 const router = useRouter()
 
@@ -330,6 +369,28 @@ const selectedWorkers = computed(() => {
 function disabledDate(date) {
   return date.getTime() < Date.now() - 24 * 60 * 60 * 1000
 }
+
+// 有效期快捷选项（提升体验，也方便自动化测试）
+const dateRangeShortcuts = [
+  {
+    text: '今天-7天',
+    value: () => {
+      const start = new Date()
+      const end = new Date()
+      end.setDate(start.getDate() + 7)
+      return [start, end]
+    }
+  },
+  {
+    text: '今天-30天',
+    value: () => {
+      const start = new Date()
+      const end = new Date()
+      end.setDate(start.getDate() + 30)
+      return [start, end]
+    }
+  }
+]
 
 // 格式化时长
 function formatDuration(seconds) {
@@ -554,6 +615,24 @@ onMounted(() => {
   padding: 12px;
   background: var(--bg-elevated);
   border-radius: var(--radius-md);
+}
+
+.select-with-close {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.select-with-close :deep(.el-select) {
+  flex: 1 1 320px;
+  min-width: 240px;
+}
+
+.select-close-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .selected-workers {

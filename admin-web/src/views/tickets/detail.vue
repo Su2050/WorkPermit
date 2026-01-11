@@ -86,7 +86,7 @@
             <el-icon><User /></el-icon>
           </div>
           <div class="stat-info">
-            <span class="stat-value">{{ ticket?.total_workers || 0 }}</span>
+            <span class="stat-value">{{ totalWorkers }}</span>
             <span class="stat-label">总人数</span>
           </div>
         </div>
@@ -123,7 +123,10 @@
       <el-card class="daily-card">
         <template #header>
           <div class="card-header">
-            <span>每日票据</span>
+            <div class="daily-header-left">
+              <span class="daily-title">每日票据</span>
+              <el-tag v-if="!dailyTicket" type="info" size="small">暂无数据</el-tag>
+            </div>
             <el-date-picker
               v-model="selectedDate"
               type="date"
@@ -134,78 +137,116 @@
             />
           </div>
         </template>
-        
-        <div v-if="dailyTicket" class="daily-content">
-          <div class="daily-header">
-            <div class="daily-status">
-              <el-tag :type="getDailyStatusType(dailyTicket.status)" size="large">
-                {{ getDailyStatusLabel(dailyTicket.status) }}
-              </el-tag>
-              <span class="daily-date">{{ dailyTicket.date }}</span>
-            </div>
-            <div class="daily-progress">
-              <span>培训完成率</span>
-              <el-progress 
-                :percentage="dailyTicket.completion_rate || 0" 
-                :stroke-width="8"
-                :color="getProgressColor(dailyTicket.completion_rate)"
-              />
-            </div>
-          </div>
-          
-          <!-- 人员列表 -->
-          <el-table :data="dailyWorkers" stripe max-height="400">
-            <el-table-column prop="name" label="姓名" width="100" />
-            <el-table-column prop="phone_masked" label="手机号" width="130" />
-            <el-table-column label="培训状态" width="120">
-              <template #default="{ row }">
-                <el-tag :type="getTrainingStatusType(row.training_status)" size="small">
-                  {{ getTrainingStatusLabel(row.training_status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="学习进度" width="180">
-              <template #default="{ row }">
-                <div class="progress-cell">
-                  <span>{{ row.completed_videos }}/{{ row.total_videos }} 视频</span>
+
+        <!-- 无数据时默认折叠；有数据时自动展开 -->
+        <div class="daily-collapse-bar" v-if="!dailyTicket">
+          <el-button text type="primary" @click="dailyExpanded = !dailyExpanded">
+            {{ dailyExpanded ? '收起' : '展开' }}
+          </el-button>
+        </div>
+
+        <el-collapse-transition>
+          <div v-show="dailyExpanded">
+            <div v-if="dailyTicket" class="daily-content">
+              <div class="daily-header">
+                <div class="daily-status">
+                  <el-tag :type="getDailyStatusType(dailyTicket.status)" size="large">
+                    {{ getDailyStatusLabel(dailyTicket.status) }}
+                  </el-tag>
+                  <span class="daily-date">{{ dailyTicket.date }}</span>
+                </div>
+                <div class="daily-progress">
+                  <span>培训完成率</span>
                   <el-progress 
-                    :percentage="row.total_videos ? (row.completed_videos / row.total_videos * 100) : 0" 
-                    :stroke-width="4"
-                    :show-text="false"
+                    :percentage="dailyTicket.completion_rate || 0" 
+                    :stroke-width="8"
+                    :color="getProgressColor(dailyTicket.completion_rate)"
                   />
                 </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="门禁授权" width="100">
-              <template #default="{ row }">
-                <el-icon v-if="row.authorized" :size="20" color="#2ea043">
-                  <CircleCheckFilled />
-                </el-icon>
-                <el-icon v-else :size="20" color="#6e7681">
-                  <CircleClose />
-                </el-icon>
-              </template>
-            </el-table-column>
-            <el-table-column label="异常事件" width="100">
-              <template #default="{ row }">
-                <el-badge 
-                  :value="row.suspicious_events" 
-                  :hidden="!row.suspicious_events"
-                  type="danger"
-                >
-                  <span>{{ row.suspicious_events || 0 }}</span>
-                </el-badge>
-              </template>
-            </el-table-column>
-            <el-table-column prop="last_activity" label="最近活动" width="160" />
-          </el-table>
-        </div>
-        
-        <el-empty v-else description="暂无数据" />
+              </div>
+              
+              <!-- 人员列表 -->
+              <el-table :data="dailyWorkers" stripe max-height="400">
+                <el-table-column prop="name" label="姓名" width="100" />
+                <el-table-column prop="phone_masked" label="手机号" width="130" />
+                <el-table-column label="培训状态" width="120">
+                  <template #default="{ row }">
+                    <el-tag :type="getTrainingStatusType(row.training_status)" size="small">
+                      {{ getTrainingStatusLabel(row.training_status) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="学习进度" width="180">
+                  <template #default="{ row }">
+                    <div class="progress-cell">
+                      <span>{{ row.completed_videos }}/{{ row.total_videos }} 视频</span>
+                      <el-progress 
+                        :percentage="row.total_videos ? (row.completed_videos / row.total_videos * 100) : 0" 
+                        :stroke-width="4"
+                        :show-text="false"
+                      />
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="门禁授权" width="100">
+                  <template #default="{ row }">
+                    <el-icon v-if="row.authorized" :size="20" color="#2ea043">
+                      <CircleCheckFilled />
+                    </el-icon>
+                    <el-icon v-else :size="20" color="#6e7681">
+                      <CircleClose />
+                    </el-icon>
+                  </template>
+                </el-table-column>
+                <el-table-column label="异常事件" width="100">
+                  <template #default="{ row }">
+                    <el-badge 
+                      :value="row.suspicious_events" 
+                      :hidden="!row.suspicious_events"
+                      type="danger"
+                    >
+                      <span>{{ row.suspicious_events || 0 }}</span>
+                    </el-badge>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="last_activity" label="最近活动" width="160" />
+              </el-table>
+            </div>
+            
+            <el-empty v-else description="暂无数据" />
+          </div>
+        </el-collapse-transition>
       </el-card>
       
       <!-- 作业区域 & 培训视频 -->
       <div class="detail-row">
+        <el-card>
+          <template #header>
+            <span>作业人员</span>
+          </template>
+          <el-table
+            :data="ticket?.workers || []"
+            stripe
+            size="small"
+            max-height="260"
+          >
+            <el-table-column prop="name" label="姓名" width="120" />
+            <el-table-column label="手机号" width="140">
+              <template #default="{ row }">
+                {{ maskPhone(row.phone) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'" size="small">
+                  {{ row.status === 'ACTIVE' ? '在票' : '已移除' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="!(ticket?.workers && ticket.workers.length)" description="暂无人员" />
+        </el-card>
+
         <el-card>
           <template #header>
             <span>作业区域</span>
@@ -213,7 +254,7 @@
           <div class="tag-list">
             <el-tag 
               v-for="area in ticket?.areas" 
-              :key="area.id"
+              :key="area.area_id || area.id"
               type="info"
               size="large"
             >
@@ -230,7 +271,7 @@
           <div class="video-list">
             <div 
               v-for="video in ticket?.videos" 
-              :key="video.id"
+              :key="video.video_id || video.id"
               class="video-item"
             >
               <el-icon :size="20"><VideoCamera /></el-icon>
@@ -426,7 +467,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ticketsApi } from '@/api/tickets'
@@ -445,6 +486,15 @@ const dailyTicket = ref(null)
 const dailyWorkers = ref([])
 const changeHistory = ref([])
 const selectedDate = ref(dayjs().format('YYYY-MM-DD'))
+// 无数据时默认折叠；当拉到有数据时自动展开
+const dailyExpanded = ref(false)
+
+// 统计：后端详情接口返回的是 workers 数组（不一定有 total_workers 字段）
+const totalWorkers = computed(() => {
+  const workers = ticket.value?.workers || []
+  // 只统计 ACTIVE，避免历史移除的人也算进去
+  return workers.filter(w => (w?.status || 'ACTIVE') === 'ACTIVE').length
+})
 
 // 变更对话框
 const changeDialogVisible = ref(false)
@@ -529,6 +579,13 @@ function getProgressColor(rate) {
   if (rate >= 80) return '#2ea043'
   if (rate >= 50) return '#d29922'
   return '#f85149'
+}
+
+function maskPhone(phone) {
+  if (!phone) return '-'
+  const s = String(phone)
+  if (s.length < 7) return s
+  return s.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
 }
 
 function getActionLabel(type) {
@@ -617,6 +674,7 @@ async function fetchDailyTicket() {
           status: data.status,
           completion_rate: data.completion_rate || 0
         }
+        dailyExpanded.value = true
         
         // 格式化工人数据
         dailyWorkers.value = (data.workers || []).map(w => ({
@@ -635,10 +693,14 @@ async function fetchDailyTicket() {
       // 没有找到该日期的每日票据
       dailyTicket.value = null
       dailyWorkers.value = []
+      dailyExpanded.value = false
     }
   } catch (error) {
     console.error('Failed to fetch daily ticket:', error)
     ElMessage.error('获取每日票据失败')
+    dailyTicket.value = null
+    dailyWorkers.value = []
+    dailyExpanded.value = false
   }
 }
 
@@ -898,6 +960,16 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+
+  /* 统一增强本页卡片标题可读性（基本信息/每日票据/作业人员/作业区域/培训视频/变更历史等） */
+  :deep(.el-card__header) {
+    color: var(--el-text-color-primary) !important;
+  }
+
+  :deep(.el-card__header span) {
+    color: var(--el-text-color-primary) !important;
+    font-weight: 700;
+  }
 }
 
 .stats-row {
@@ -952,6 +1024,26 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+
+    .daily-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 120px;
+    }
+
+    .daily-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--el-text-color-primary);
+    }
+  }
+
+  .daily-collapse-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 0 8px;
   }
   
   .daily-header {
@@ -968,7 +1060,8 @@ onMounted(() => {
       gap: 12px;
       
       .daily-date {
-        color: var(--text-secondary);
+        color: var(--el-text-color-primary);
+        font-weight: 500;
       }
     }
     
@@ -980,8 +1073,9 @@ onMounted(() => {
       
       span {
         white-space: nowrap;
-        color: var(--text-secondary);
+        color: var(--el-text-color-primary);
         font-size: 14px;
+        font-weight: 500;
       }
     }
   }
