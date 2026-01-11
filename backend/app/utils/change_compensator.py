@@ -253,7 +253,7 @@ class TicketChangeCompensator:
             resource_type="WorkTicket",
             resource_id=ticket.ticket_id,
             operator_id=operator_id,
-            changes=changes.__dict__,
+            new_value={k: str(v) if isinstance(v, (uuid.UUID, list)) else v for k, v in changes.__dict__.items() if v},
             reason=changes.reason
         )
         
