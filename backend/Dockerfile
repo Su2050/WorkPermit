@@ -22,20 +22,21 @@ COPY . .
 RUN echo '#!/bin/bash\n\
 set -e\n\
 cd /app\n\
+PORT=${PORT:-8000}\n\
 echo "Waiting for database..."\n\
 sleep 5\n\
 echo "Running database migrations..."\n\
 alembic upgrade head || echo "Migration failed, continuing..."\n\
-echo "Starting application..."\n\
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000' > /entrypoint.sh && \
+echo "Starting application on port $PORT..."\n\
+exec uvicorn app.main:app --host 0.0.0.0 --port $PORT' > /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
-# 暴露端口
+# 暴露端口（默认8000，可通过环境变量覆盖）
 EXPOSE 8000
 
-# 健康检查
+# 健康检查（使用环境变量PORT，默认8000）
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8000/api/health || exit 1
+  CMD PORT=${PORT:-8000} && curl -f http://localhost:$PORT/api/health || exit 1
 
 # 启动命令
 CMD ["/entrypoint.sh"]
