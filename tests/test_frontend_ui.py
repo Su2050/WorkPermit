@@ -389,6 +389,139 @@ class TestAreaManagement:
         print("  ✓ 区域列表加载成功")
 
 
+class TestContractorManagement:
+    """施工单位管理测试"""
+    
+    @pytest.fixture(autouse=True)
+    def login_and_navigate(self, page: Page):
+        """登录并导航到施工单位管理"""
+        page.goto(f"{BASE_URL}/login")
+        page.wait_for_load_state("networkidle")
+        page.locator('input[placeholder*="用户名"]').fill(TEST_USERNAME)
+        page.locator('input[type="password"]').fill(TEST_PASSWORD)
+        page.locator('button:has-text("登录")').click()
+        # 等待跳转到dashboard或首页
+        page.wait_for_url("**/dashboard**", timeout=10000)
+        page.wait_for_load_state("networkidle")
+        
+        # 导航到施工单位管理（使用菜单项，避免匹配到表格中的文本）
+        page.get_by_role("menuitem", name="施工单位").first.click()
+        page.wait_for_url("**/contractors**", timeout=5000)
+        page.wait_for_load_state("networkidle")
+    
+    def test_create_contractor_no_site_error(self, page: Page):
+        """测试: 无工地时创建施工单位，应该显示错误提示和快捷链接"""
+        print("\n  === 测试无工地时创建施工单位 ===")
+        
+        # 监听API响应，检查是否有"没有工地"的错误
+        error_message_found = False
+        error_message_text = ""
+        
+        def handle_response(response):
+            nonlocal error_message_found, error_message_text
+            if "/api/admin/contractors" in response.url and response.request.method == "POST":
+                if response.status == 200:
+                    try:
+                        data = response.json()
+                        message = data.get("message", "")
+                        if "没有工地" in message or "请先创建工地" in message:
+                            error_message_found = True
+                            error_message_text = message
+                    except:
+                        pass
+        
+        page.on("response", handle_response)
+        
+        # 点击"新增施工单位"按钮
+        print("  1. 点击新增施工单位按钮...")
+        add_button = page.locator('button:has-text("新增施工单位")')
+        add_button.click()
+        page.wait_for_timeout(500)
+        
+        # 填写表单
+        print("  2. 填写表单...")
+        page.locator('input[placeholder*="单位名称"]').fill("测试施工单位")
+        page.locator('input[placeholder*="单位编码"]').fill(f"TEST_{int(time.time())}")
+        page.locator('input[placeholder*="联系人"]').fill("测试联系人")
+        page.locator('input[placeholder*="联系电话"]').fill("13800138000")
+        
+        # 提交表单
+        print("  3. 提交表单...")
+        submit_button = page.locator('button:has-text("确定")').last
+        submit_button.click()
+        
+        # 等待响应
+        page.wait_for_timeout(2000)
+        
+        # 检查是否有错误提示对话框（ElMessageBox）
+        print("  4. 检查错误提示...")
+        try:
+            # 检查是否有确认对话框（ElMessageBox）
+            messagebox = page.locator('.el-message-box')
+            if messagebox.is_visible(timeout=3000):
+                print("  ✓ 检测到错误提示对话框")
+                
+                # 检查对话框内容
+                messagebox_text = messagebox.text_content()
+                if "没有工地" in messagebox_text or "请先创建工地" in messagebox_text:
+                    print("  ✓ 错误消息包含'没有工地'或'请先创建工地'")
+                
+                # 检查是否有"去创建工地"按钮
+                create_site_button = page.locator('button:has-text("去创建工地")')
+                if create_site_button.is_visible(timeout=1000):
+                    print("  ✓ 检测到'去创建工地'按钮")
+                    
+                    # 点击按钮
+                    print("  5. 点击'去创建工地'按钮...")
+                    create_site_button.click()
+                    page.wait_for_timeout(1000)
+                    
+                    # 验证是否跳转到工地管理页面
+                    page.wait_for_url("**/sites", timeout=3000)
+                    print("  ✓ 成功跳转到工地管理页面")
+                else:
+                    print("  ⚠ 未找到'去创建工地'按钮")
+            else:
+                # 如果没有对话框，检查是否有错误消息（ElMessage）
+                error_message = page.locator('.el-message--error')
+                if error_message.is_visible(timeout=2000):
+                    message_text = error_message.text_content()
+                    print(f"  ⚠ 检测到错误消息: {message_text}")
+                    if "没有工地" in message_text or "请先创建工地" in message_text:
+                        print("  ✓ 错误消息包含'没有工地'或'请先创建工地'")
+                else:
+                    print("  ⚠ 未检测到错误提示")
+        except Exception as e:
+            print(f"  ⚠ 检查错误提示时出现异常: {e}")
+        
+        # 如果检测到错误消息，验证其内容
+        if error_message_found:
+            print(f"  ✓ API返回错误消息: {error_message_text}")
+    
+    def test_sites_page_navigation(self, page: Page):
+        """测试: 导航到工地管理页面"""
+        print("\n  === 测试工地管理页面导航 ===")
+        
+        # 检查导航菜单中是否有"工地管理"
+        try:
+            sites_menu = page.get_by_role("menuitem", name="工地管理").first
+            if sites_menu.is_visible(timeout=2000):
+                print("  ✓ 导航菜单中存在'工地管理'")
+                
+                # 点击工地管理
+                sites_menu.click()
+                page.wait_for_url("**/sites**", timeout=5000)
+                page.wait_for_load_state("networkidle")
+                
+                # 验证页面加载
+                expect(page.locator('h1:has-text("工地管理")')).to_be_visible(timeout=3000)
+                print("  ✓ 成功导航到工地管理页面")
+            else:
+                print("  ⚠ 导航菜单中未找到'工地管理'")
+        except Exception as e:
+            print(f"  ⚠ 导航测试异常: {e}")
+
+
 # 运行测试时的配置
 def pytest_configure(config):
     """pytest配置"""

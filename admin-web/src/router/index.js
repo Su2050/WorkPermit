@@ -44,6 +44,12 @@ const routes = [
       },
       // 基础数据
       {
+        path: 'sites',
+        name: 'Sites',
+        component: () => import('@/views/sites/index.vue'),
+        meta: { title: '工地管理', icon: 'Office' }
+      },
+      {
         path: 'areas',
         name: 'Areas',
         component: () => import('@/views/areas/index.vue'),

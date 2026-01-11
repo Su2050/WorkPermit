@@ -1,24 +1,23 @@
 <template>
-  <div class="contractors-page">
+  <div class="sites-page">
     <div class="page-header">
       <div class="header-left">
-        <h1>施工单位管理</h1>
-        <p>管理合作的施工单位信息</p>
+        <h1>工地管理</h1>
+        <p>管理系统中的工地信息</p>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>
-          新增施工单位
+          新增工地
         </el-button>
       </div>
     </div>
     
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="name" label="单位名称" min-width="200" />
-        <el-table-column prop="code" label="单位编码" width="120" />
-        <el-table-column prop="contact_person" label="联系人" width="100" />
-        <el-table-column prop="contact_phone" label="联系电话" width="130" />
+        <el-table-column prop="name" label="工地名称" min-width="200" />
+        <el-table-column prop="code" label="工地编码" width="120" />
+        <el-table-column prop="address" label="地址" min-width="200" />
         <el-table-column prop="is_active" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
@@ -29,7 +28,7 @@
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button text type="primary" size="small" @click="handleViewWorkers(row)">人员</el-button>
+            <el-button text type="primary" size="small" @click="handleView(row)">详情</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -52,35 +51,66 @@
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="600px"
+      width="700px"
       :close-on-click-modal="false"
     >
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="120px"
+        label-width="140px"
       >
-        <el-form-item label="单位名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入单位名称" />
+        <el-form-item label="工地名称" prop="name">
+          <el-input v-model="form.name" placeholder="请输入工地名称" />
         </el-form-item>
-        <el-form-item label="单位编码" prop="code">
-          <el-input v-model="form.code" placeholder="请输入单位编码（唯一）" />
-        </el-form-item>
-        <el-form-item label="联系人" prop="contact_person">
-          <el-input v-model="form.contact_person" placeholder="请输入联系人姓名" />
-        </el-form-item>
-        <el-form-item label="联系电话" prop="contact_phone">
-          <el-input v-model="form.contact_phone" placeholder="请输入联系电话" />
+        <el-form-item label="工地编码" prop="code">
+          <el-input 
+            v-model="form.code" 
+            :placeholder="isEdit ? '工地编码不可修改' : '请输入工地编码（唯一）'" 
+            :disabled="isEdit"
+          />
+          <div v-if="isEdit" style="color: #909399; font-size: 12px; margin-top: 4px;">
+            工地编码创建后不可修改
+          </div>
         </el-form-item>
         <el-form-item label="地址" prop="address">
           <el-input v-model="form.address" type="textarea" rows="2" placeholder="请输入地址" />
         </el-form-item>
-        <el-form-item label="营业执照号" prop="license_no">
-          <el-input v-model="form.license_no" placeholder="请输入营业执照号" />
+        <el-form-item label="描述" prop="description">
+          <el-input v-model="form.description" type="textarea" rows="3" placeholder="请输入工地描述（可选）" />
         </el-form-item>
-        <el-form-item label="资质等级" prop="qualification_level">
-          <el-input v-model="form.qualification_level" placeholder="请输入资质等级" />
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="默认授权开始时间" prop="default_access_start_time">
+              <el-time-picker
+                v-model="form.default_access_start_time"
+                format="HH:mm:ss"
+                value-format="HH:mm:ss"
+                placeholder="选择时间"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="默认授权结束时间" prop="default_access_end_time">
+              <el-time-picker
+                v-model="form.default_access_end_time"
+                format="HH:mm:ss"
+                value-format="HH:mm:ss"
+                placeholder="选择时间"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="默认培训截止时间" prop="default_training_deadline">
+          <el-time-picker
+            v-model="form.default_training_deadline"
+            format="HH:mm:ss"
+            value-format="HH:mm:ss"
+            placeholder="选择时间"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item v-if="isEdit" label="状态" prop="is_active">
           <el-switch v-model="form.is_active" />
@@ -98,8 +128,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { contractorsApi } from '@/api/contractors'
+import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import { sitesApi } from '@/api/sites'
 
 const router = useRouter()
 
@@ -119,30 +150,39 @@ const pagination = reactive({
 const form = reactive({
   name: '',
   code: '',
-  contact_person: '',
-  contact_phone: '',
   address: '',
-  license_no: '',
-  qualification_level: '',
+  description: '',
+  default_access_start_time: '06:00:00',
+  default_access_end_time: '20:00:00',
+  default_training_deadline: '07:30:00',
   is_active: true
 })
 
 const rules = {
   name: [
-    { required: true, message: '请输入单位名称', trigger: 'blur' }
+    { required: true, message: '请输入工地名称', trigger: 'blur' }
   ],
   code: [
-    { required: true, message: '请输入单位编码', trigger: 'blur' }
+    { required: true, message: '请输入工地编码', trigger: 'blur' }
+  ],
+  default_access_start_time: [
+    { required: true, message: '请选择默认授权开始时间', trigger: 'change' }
+  ],
+  default_access_end_time: [
+    { required: true, message: '请选择默认授权结束时间', trigger: 'change' }
+  ],
+  default_training_deadline: [
+    { required: true, message: '请选择默认培训截止时间', trigger: 'change' }
   ]
 }
 
-const dialogTitle = computed(() => isEdit.value ? '编辑施工单位' : '新增施工单位')
+const dialogTitle = computed(() => isEdit.value ? '编辑工地' : '新增工地')
 
 // 获取列表数据
 async function fetchList() {
   loading.value = true
   try {
-    const response = await contractorsApi.getList({
+    const response = await sitesApi.getList({
       page: pagination.page,
       page_size: pagination.page_size
     })
@@ -152,7 +192,7 @@ async function fetchList() {
       pagination.total = response.data.data.total || 0
     }
   } catch (error) {
-    console.error('Failed to fetch contractors:', error)
+    console.error('Failed to fetch sites:', error)
     ElMessage.error('获取数据失败')
   } finally {
     loading.value = false
@@ -170,23 +210,32 @@ function handleAdd() {
 function handleEdit(row) {
   isEdit.value = true
   resetForm()
-  Object.assign(form, {
-    contractor_id: row.contractor_id,
-    name: row.name,
-    code: row.code,
-    contact_person: row.contact_person || '',
-    contact_phone: row.contact_phone || '',
-    address: row.address || '',
-    license_no: row.license_no || '',
-    qualification_level: row.qualification_level || '',
-    is_active: row.is_active
+  // 获取详情
+  sitesApi.getDetail(row.site_id).then(response => {
+    if (response.data?.code === 0) {
+      const detail = response.data.data
+      Object.assign(form, {
+        site_id: detail.site_id,
+        name: detail.name,
+        code: detail.code,
+        address: detail.address || '',
+        description: detail.description || '',
+        default_access_start_time: detail.default_access_start_time || '06:00:00',
+        default_access_end_time: detail.default_access_end_time || '20:00:00',
+        default_training_deadline: detail.default_training_deadline || '07:30:00',
+        is_active: detail.is_active
+      })
+      dialogVisible.value = true
+    }
+  }).catch(error => {
+    console.error('Failed to fetch site detail:', error)
+    ElMessage.error('获取工地详情失败')
   })
-  dialogVisible.value = true
 }
 
-// 查看人员
-function handleViewWorkers(row) {
-  ElMessage.info('查看人员功能开发中')
+// 查看详情
+function handleView(row) {
+  router.push(`/sites/${row.site_id}`)
 }
 
 // 重置表单
@@ -194,11 +243,11 @@ function resetForm() {
   Object.assign(form, {
     name: '',
     code: '',
-    contact_person: '',
-    contact_phone: '',
     address: '',
-    license_no: '',
-    qualification_level: '',
+    description: '',
+    default_access_start_time: '06:00:00',
+    default_access_end_time: '20:00:00',
+    default_training_deadline: '07:30:00',
     is_active: true
   })
   formRef.value?.resetFields()
@@ -216,9 +265,9 @@ async function handleSubmit() {
     try {
       let response
       if (isEdit.value) {
-        response = await contractorsApi.update(form.contractor_id, form)
+        response = await sitesApi.update(form.site_id, form)
       } else {
-        response = await contractorsApi.create(form)
+        response = await sitesApi.create(form)
       }
       
       if (response.data?.code === 0) {
@@ -226,28 +275,10 @@ async function handleSubmit() {
         dialogVisible.value = false
         await fetchList()
       } else {
-        const errorMessage = response.data?.message || '操作失败'
-        // 检查是否是"没有工地"的错误
-        if (errorMessage.includes('没有工地') || errorMessage.includes('请先创建工地')) {
-          ElMessageBox.confirm(
-            errorMessage + '，是否前往创建工地？',
-            '提示',
-            {
-              confirmButtonText: '去创建工地',
-              cancelButtonText: '取消',
-              type: 'warning'
-            }
-          ).then(() => {
-            router.push('/sites')
-          }).catch(() => {
-            // 用户取消，不做任何操作
-          })
-        } else {
-          ElMessage.error(errorMessage)
-        }
+        ElMessage.error(response.data?.message || '操作失败')
       }
     } catch (error) {
-      console.error('Failed to save contractor:', error)
+      console.error('Failed to save site:', error)
       ElMessage.error('操作失败，请重试')
     } finally {
       submitting.value = false
@@ -270,7 +301,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.contractors-page {
+.sites-page {
   display: flex;
   flex-direction: column;
   gap: 20px;
