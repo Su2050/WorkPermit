@@ -369,6 +369,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ticketsApi } from '@/api/tickets'
 import { contractorsApi } from '@/api/contractors'
+import { workersApi } from '@/api/workers'
+import { areasApi } from '@/api/areas'
 
 const router = useRouter()
 
@@ -519,7 +521,7 @@ function handleSortChange({ prop, order }) {
 }
 
 // 编辑/变更
-function handleEdit(row) {
+async function handleEdit(row) {
   currentTicket.value = row
   changeForm.changeType = 'workers'
   changeForm.addWorkers = []
@@ -530,6 +532,12 @@ function handleEdit(row) {
   changeForm.accessEndTime = null
   changeForm.reason = ''
   changeDialogVisible.value = true
+  
+  // 加载人员和区域选项
+  await Promise.all([
+    fetchWorkerOptions(),
+    fetchAreaOptions()
+  ])
 }
 
 // 提交变更
@@ -709,6 +717,30 @@ async function fetchContractorOptions() {
     }
   } catch (error) {
     console.error('Failed to fetch contractor options:', error)
+  }
+}
+
+// 获取人员选项（变更弹窗用）
+async function fetchWorkerOptions() {
+  try {
+    const response = await workersApi.getOptions({ page_size: 500 })
+    if (response.data?.code === 0) {
+      workerOptions.value = response.data.data || []
+    }
+  } catch (error) {
+    console.error('Failed to fetch worker options:', error)
+  }
+}
+
+// 获取区域选项（变更弹窗用）
+async function fetchAreaOptions() {
+  try {
+    const response = await areasApi.getOptions({ page_size: 500 })
+    if (response.data?.code === 0) {
+      areaOptions.value = response.data.data || []
+    }
+  } catch (error) {
+    console.error('Failed to fetch area options:', error)
   }
 }
 
