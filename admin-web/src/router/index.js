@@ -50,6 +50,12 @@ const routes = [
         meta: { title: '工地管理', icon: 'Office' }
       },
       {
+        path: 'sites/:id',
+        name: 'SiteDetail',
+        component: () => import('@/views/sites/detail.vue'),
+        meta: { title: '工地详情', hidden: true }
+      },
+      {
         path: 'areas',
         name: 'Areas',
         component: () => import('@/views/areas/index.vue'),

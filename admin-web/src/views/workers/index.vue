@@ -183,6 +183,10 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { workersApi } from '@/api/workers'
 import { contractorsApi } from '@/api/contractors'
+import { sitesApi } from '@/api/sites'
+import { useAppStore } from '@/stores/app'
+
+const appStore = useAppStore()
 
 const loading = ref(false)
 const dialogVisible = ref(false)
@@ -363,7 +367,28 @@ async function handleSubmit() {
           status: form.status
         })
       } else {
+        // 获取site_id（从app store或从第一个可用site）
+        let siteId = appStore.currentSiteId
+        
+        // 如果app store中没有site_id，从sites/options获取第一个
+        if (!siteId) {
+          try {
+            const sitesResponse = await sitesApi.getOptions()
+            if (sitesResponse.data?.code === 0 && sitesResponse.data.data?.length > 0) {
+              siteId = sitesResponse.data.data[0].site_id || sitesResponse.data.data[0].id
+            }
+          } catch (error) {
+            console.error('Failed to fetch sites:', error)
+          }
+        }
+        
+        if (!siteId) {
+          ElMessage.error('无法确定工地，请先创建工地')
+          return
+        }
+        
         response = await workersApi.create({
+          site_id: siteId,
           name: form.name,
           phone: form.phone,
           id_no: form.id_no,

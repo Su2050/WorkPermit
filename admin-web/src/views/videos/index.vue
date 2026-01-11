@@ -119,6 +119,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { videosApi } from '@/api/videos'
+import { sitesApi } from '@/api/sites'
+import { useAppStore } from '@/stores/app'
+
+const appStore = useAppStore()
 
 const loading = ref(false)
 const dialogVisible = ref(false)
@@ -135,6 +139,7 @@ const pagination = reactive({
 
 const form = reactive({
   video_id: '', // For edit
+  site_id: '', // 所属工地
   title: '',
   description: '',
   file_url: '',
@@ -216,6 +221,7 @@ function handleEdit(row) {
 function resetForm() {
   Object.assign(form, {
     video_id: '',
+    site_id: '',
     title: '',
     description: '',
     file_url: '',
@@ -247,7 +253,28 @@ async function handleSubmit() {
           status: 'ACTIVE'
         })
       } else {
+        // 获取site_id（从app store或从第一个可用site）
+        let siteId = appStore.currentSiteId
+        
+        // 如果app store中没有site_id，从sites/options获取第一个
+        if (!siteId) {
+          try {
+            const sitesResponse = await sitesApi.getOptions()
+            if (sitesResponse.data?.code === 0 && sitesResponse.data.data?.length > 0) {
+              siteId = sitesResponse.data.data[0].site_id || sitesResponse.data.data[0].id
+            }
+          } catch (error) {
+            console.error('Failed to fetch sites:', error)
+          }
+        }
+        
+        if (!siteId) {
+          ElMessage.error('无法确定工地，请先创建工地')
+          return
+        }
+        
         response = await videosApi.create({
+          site_id: siteId,
           title: form.title,
           description: form.description,
           file_url: form.file_url,

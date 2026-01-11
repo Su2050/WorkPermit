@@ -126,13 +126,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { sitesApi } from '@/api/sites'
 
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -294,6 +295,19 @@ function handleSizeChange() {
 function handlePageChange() {
   fetchList()
 }
+
+// 监听路由参数，如果有点击编辑的site_id，自动打开编辑对话框
+watch(() => route.query.edit, (siteId) => {
+  if (siteId) {
+    // 从列表中找到对应的工地并打开编辑对话框
+    const site = tableData.value.find(s => s.site_id === siteId)
+    if (site) {
+      handleEdit(site)
+      // 清除查询参数
+      router.replace({ query: {} })
+    }
+  }
+}, { immediate: true })
 
 onMounted(() => {
   fetchList()
