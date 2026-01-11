@@ -1,0 +1,77 @@
+<!--pages/training/video.wxml-->
+<view class="page">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-full">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">正在加载视频...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 视频播放器 -->
+    <view class="video-container">
+      <video
+        id="trainingVideo"
+        class="video-player"
+        src="{{videoInfo.url}}"
+        poster="{{videoInfo.thumbnail}}"
+        controls="{{true}}"
+        show-center-play-btn="{{true}}"
+        enable-progress-gesture="{{false}}"
+        enable-play-gesture="{{false}}"
+        bindplay="onVideoPlay"
+        bindpause="onVideoPause"
+        bindtimeupdate="onVideoTimeUpdate"
+        bindended="onVideoEnded"
+        binderror="onVideoError"
+      />
+    </view>
+
+    <!-- 视频信息 -->
+    <view class="video-info container">
+      <text class="video-title">{{videoInfo.title}}</text>
+      <text class="video-desc">{{videoInfo.description}}</text>
+      
+      <view class="progress-section">
+        <view class="progress-header">
+          <text>学习进度</text>
+          <text class="progress-text">{{progressPercent}}%</text>
+        </view>
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{progressPercent}}%"></view>
+        </view>
+      </view>
+
+      <view class="tips-section">
+        <view class="tip-item">
+          <text class="tip-icon">⚠️</text>
+          <text class="tip-text">请全程观看视频，不要快进</text>
+        </view>
+        <view class="tip-item">
+          <text class="tip-icon">📱</text>
+          <text class="tip-text">学习过程中可能会进行人脸验证</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 人脸校验弹窗 -->
+    <view wx:if="{{showFaceCheck}}" class="face-check-modal">
+      <view class="face-check-content">
+        <view class="face-check-header">
+          <text class="face-check-title">身份验证</text>
+          <text class="face-check-countdown">{{faceCheckCountdown}}s</text>
+        </view>
+        
+        <view class="face-check-body">
+          <view class="face-icon">👤</view>
+          <text class="face-check-tip">请点击下方按钮进行人脸验证</text>
+          <text class="face-check-tip2">验证通过后可继续学习</text>
+        </view>
+        
+        <button class="btn btn-primary btn-block" bindtap="startFaceCheck">
+          开始验证
+        </button>
+      </view>
+    </view>
+  </block>
+</view>
+

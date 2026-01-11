@@ -1,0 +1,152 @@
+/**
+ * 视频播放页面样式
+ */
+.page {
+  min-height: 100vh;
+  background: var(--bg-dark);
+}
+
+.loading-full {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.loading-text {
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  color: var(--text-muted);
+}
+
+.video-container {
+  width: 100%;
+  background: #000;
+}
+
+.video-player {
+  width: 100%;
+  height: 420rpx;
+}
+
+.video-info {
+  padding-top: 32rpx;
+}
+
+.video-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.video-desc {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 32rpx;
+}
+
+.progress-section {
+  padding: 24rpx;
+  background: var(--bg-card);
+  border-radius: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+  color: var(--text-secondary);
+}
+
+.tips-section {
+  padding: 24rpx;
+  background: var(--bg-card);
+  border-radius: 16rpx;
+}
+
+.tip-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 12rpx 0;
+}
+
+.tip-item:first-child {
+  border-bottom: 2rpx solid var(--border-color);
+}
+
+.tip-icon {
+  font-size: 32rpx;
+}
+
+.tip-text {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+}
+
+/* 人脸校验弹窗 */
+.face-check-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.face-check-content {
+  width: 600rpx;
+  background: var(--bg-card);
+  border-radius: 24rpx;
+  padding: 40rpx;
+}
+
+.face-check-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40rpx;
+}
+
+.face-check-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.face-check-countdown {
+  font-size: 32rpx;
+  color: var(--danger-color);
+  font-weight: 600;
+}
+
+.face-check-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 40rpx;
+}
+
+.face-icon {
+  font-size: 120rpx;
+  margin-bottom: 32rpx;
+}
+
+.face-check-tip {
+  font-size: 28rpx;
+  color: var(--text-primary);
+  margin-bottom: 12rpx;
+}
+
+.face-check-tip2 {
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+

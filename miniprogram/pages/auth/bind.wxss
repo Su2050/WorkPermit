@@ -1,0 +1,134 @@
+/**
+ * 身份绑定页面样式
+ */
+.page {
+  min-height: 100vh;
+  padding-top: 100rpx;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 60rpx;
+}
+
+.logo {
+  width: 140rpx;
+  height: 140rpx;
+  margin-bottom: 32rpx;
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12rpx;
+}
+
+.subtitle {
+  font-size: 28rpx;
+  color: var(--text-muted);
+}
+
+.header-sm {
+  margin-bottom: 40rpx;
+}
+
+.header-sm .title {
+  font-size: 40rpx;
+  margin-bottom: 8rpx;
+}
+
+.header-sm .subtitle {
+  font-size: 26rpx;
+}
+
+.info-box {
+  margin-bottom: 48rpx;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 0;
+}
+
+.info-item:first-child {
+  border-bottom: 2rpx solid var(--border-color);
+}
+
+.info-icon {
+  font-size: 36rpx;
+}
+
+.info-text {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+}
+
+.form-card {
+  margin-bottom: 32rpx;
+}
+
+.phone-input-wrap {
+  display: flex;
+  gap: 16rpx;
+}
+
+.phone-input {
+  flex: 1;
+}
+
+.get-phone-btn {
+  width: 160rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0;
+  font-size: 24rpx;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 12rpx;
+}
+
+.agreement {
+  margin-bottom: 32rpx;
+}
+
+.agreement-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.agreement-text {
+  flex: 1;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.link {
+  color: var(--accent-color);
+}
+
+checkbox {
+  transform: scale(0.8);
+}
+
+.tips {
+  text-align: center;
+  margin-top: 32rpx;
+}
+
+.tips-text {
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+

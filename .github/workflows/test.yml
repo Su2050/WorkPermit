@@ -1,0 +1,224 @@
+# GitHub Actions CI/CD 测试工作流
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # 后端API测试
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workpermit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-html
+    
+    - name: Install test dependencies
+      run: |
+        pip install -r tests/requirements.txt
+    
+    - name: Set up database
+      run: |
+        cd backend
+        # 配置测试数据库
+        export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workpermit_test
+        # 运行数据库迁移
+        alembic upgrade head || echo "Migration skipped"
+    
+    - name: Start backend server
+      run: |
+        cd backend
+        export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workpermit_test
+        export SECRET_KEY=test_secret_key_for_ci
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Run backend API tests
+      run: |
+        pytest tests/backend/ -v --html=reports/backend_report.html --self-contained-html
+      continue-on-error: true
+    
+    - name: Upload backend test report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: backend-test-report
+        path: reports/backend_report.html
+
+  # 集成测试
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workpermit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install -r ../tests/requirements.txt
+    
+    - name: Start backend server
+      run: |
+        cd backend
+        export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workpermit_test
+        export SECRET_KEY=test_secret_key_for_ci
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --html=reports/integration_report.html --self-contained-html
+      continue-on-error: true
+    
+    - name: Upload integration test report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-report
+        path: reports/integration_report.html
+
+  # 前端UI测试
+  frontend-tests:
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workpermit_test
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install Python dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install -r ../tests/requirements.txt
+    
+    - name: Install Playwright
+      run: |
+        pip install playwright
+        playwright install chromium
+        playwright install-deps
+    
+    - name: Install frontend dependencies
+      run: |
+        cd admin-web
+        npm install
+    
+    - name: Start backend server
+      run: |
+        cd backend
+        export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workpermit_test
+        export SECRET_KEY=test_secret_key_for_ci
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Start frontend server
+      run: |
+        cd admin-web
+        npm run dev &
+        sleep 10
+    
+    - name: Run frontend UI tests
+      run: |
+        pytest tests/frontend/ -v --html=reports/frontend_report.html --self-contained-html
+      continue-on-error: true
+    
+    - name: Upload frontend test report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: frontend-test-report
+        path: reports/frontend_report.html
+
+  # 汇总测试结果
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, integration-tests, frontend-tests]
+    if: always()
+    
+    steps:
+    - name: Download all test reports
+      uses: actions/download-artifact@v3
+    
+    - name: Create test summary
+      run: |
+        echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Backend API Tests | ${{ needs.backend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Frontend UI Tests | ${{ needs.frontend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+

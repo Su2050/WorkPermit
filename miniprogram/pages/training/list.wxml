@@ -1,0 +1,79 @@
+<!--pages/training/list.wxml-->
+<view class="page">
+  <view class="container">
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="loading">
+      <view class="loading-spinner"></view>
+    </view>
+
+    <block wx:else>
+      <!-- 票据信息 -->
+      <view class="ticket-card card">
+        <text class="ticket-title">{{ticketInfo.title}}</text>
+        <view class="ticket-info">
+          <text class="ticket-item">{{ticketInfo.contractor_name}}</text>
+          <text class="ticket-item">截止时间: {{ticketInfo.deadline_time}}</text>
+        </view>
+        <view class="ticket-progress">
+          <view class="progress-info">
+            <text>总体进度</text>
+            <text class="progress-text">
+              {{ticketInfo.completed_videos}}/{{ticketInfo.total_videos}} 视频
+            </text>
+          </view>
+          <view class="progress-bar">
+            <view 
+              class="progress-fill" 
+              style="width: {{ticketInfo.total_videos ? (ticketInfo.completed_videos / ticketInfo.total_videos * 100) : 0}}%"
+            ></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 视频列表 -->
+      <view class="section">
+        <view class="section-header">
+          <text class="section-title">培训视频</text>
+        </view>
+
+        <view class="video-list">
+          <view 
+            wx:for="{{videos}}" 
+            wx:key="video_id"
+            class="video-card card {{item.status === 'COMPLETED' ? 'completed' : ''}}"
+            bindtap="startVideo"
+            data-video-id="{{item.video_id}}"
+            data-status="{{item.status}}"
+          >
+            <view class="video-thumb">
+              <image src="{{item.thumbnail || '/assets/images/video-default.png'}}" mode="aspectFill" />
+              <view class="video-duration">{{item.duration_text}}</view>
+              <view wx:if="{{item.status === 'COMPLETED'}}" class="video-completed">
+                <text class="completed-icon">✓</text>
+              </view>
+            </view>
+            
+            <view class="video-info">
+              <text class="video-title">{{item.title}}</text>
+              <text class="video-desc">{{item.description}}</text>
+              
+              <view wx:if="{{item.status === 'IN_PROGRESS'}}" class="video-progress">
+                <view class="progress-bar small">
+                  <view class="progress-fill" style="width: {{item.progress_percent}}%"></view>
+                </view>
+                <text class="progress-text">{{item.progress_percent}}%</text>
+              </view>
+              
+              <view class="video-status">
+                <view class="tag {{item.status === 'COMPLETED' ? 'tag-success' : item.status === 'IN_PROGRESS' ? 'tag-warning' : 'tag-info'}}">
+                  {{item.status === 'COMPLETED' ? '已完成' : item.status === 'IN_PROGRESS' ? '学习中' : '未开始'}}
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>
+

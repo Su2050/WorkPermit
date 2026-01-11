@@ -1,0 +1,109 @@
+<!--pages/index/index.wxml-->
+<view class="page">
+  <!-- 未登录状态 -->
+  <view wx:if="{{!isLoggedIn}}" class="not-logged-in">
+    <view class="logo-area">
+      <image class="logo" src="/assets/images/logo.png" mode="aspectFit" />
+      <text class="title">作业票培训系统</text>
+      <text class="subtitle">安全培训 · 智慧工地</text>
+    </view>
+    <button class="btn btn-primary btn-block" bindtap="goLogin">
+      立即登录
+    </button>
+  </view>
+
+  <!-- 已登录状态 -->
+  <view wx:else class="container">
+    <!-- 欢迎区域 -->
+    <view class="welcome-card card">
+      <view class="welcome-content">
+        <text class="welcome-text">你好，{{workerInfo.name || '工友'}}</text>
+        <text class="welcome-date">今日还有 {{taskStats.remaining}} 项培训待完成</text>
+      </view>
+      <view class="welcome-avatar">
+        <text class="avatar-text">{{workerInfo.name[0] || 'U'}}</text>
+      </view>
+    </view>
+
+    <!-- 统计卡片 -->
+    <view class="stats-row">
+      <view class="stat-item">
+        <text class="stat-value">{{taskStats.total}}</text>
+        <text class="stat-label">今日任务</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value text-success">{{taskStats.completed}}</text>
+        <text class="stat-label">已完成</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value text-warning">{{taskStats.remaining}}</text>
+        <text class="stat-label">待完成</text>
+      </view>
+    </view>
+
+    <!-- 任务列表 -->
+    <view class="section">
+      <view class="section-header">
+        <text class="section-title">今日培训任务</text>
+      </view>
+
+      <!-- 加载中 -->
+      <view wx:if="{{loading}}" class="loading">
+        <view class="loading-spinner"></view>
+      </view>
+
+      <!-- 空状态 -->
+      <view wx:elif="{{!todayTasks.length}}" class="empty-state">
+        <image class="empty-icon" src="/assets/images/empty.png" mode="aspectFit" />
+        <text class="empty-text">暂无培训任务</text>
+      </view>
+
+      <!-- 任务列表 -->
+      <view wx:else class="task-list">
+        <view 
+          wx:for="{{todayTasks}}" 
+          wx:key="daily_ticket_id"
+          class="task-card card"
+          bindtap="goTaskDetail"
+          data-id="{{item.daily_ticket_id}}"
+        >
+          <view class="task-header">
+            <text class="task-title">{{item.ticket_title}}</text>
+            <view class="tag {{item.training_status === 'COMPLETED' ? 'tag-success' : item.training_status === 'IN_LEARNING' ? 'tag-warning' : 'tag-info'}}">
+              {{item.training_status === 'COMPLETED' ? '已完成' : item.training_status === 'IN_LEARNING' ? '学习中' : '未开始'}}
+            </view>
+          </view>
+          
+          <view class="task-info">
+            <text class="task-contractor">{{item.contractor_name}}</text>
+            <text class="task-deadline">截止时间: {{item.deadline_time}}</text>
+          </view>
+          
+          <view class="task-progress">
+            <view class="progress-info">
+              <text>学习进度</text>
+              <text class="progress-text">{{item.completed_videos}}/{{item.total_videos}} 视频</text>
+            </view>
+            <view class="progress-bar">
+              <view 
+                class="progress-fill" 
+                style="width: {{item.total_videos ? (item.completed_videos / item.total_videos * 100) : 0}}%"
+              ></view>
+            </view>
+          </view>
+
+          <view wx:if="{{item.training_status !== 'COMPLETED'}}" class="task-action">
+            <button 
+              class="btn btn-primary btn-sm"
+              catchtap="startTraining"
+              data-id="{{item.daily_ticket_id}}"
+            >
+              {{item.training_status === 'IN_LEARNING' ? '继续学习' : '开始学习'}}
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+

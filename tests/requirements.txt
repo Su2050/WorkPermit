@@ -1,0 +1,12 @@
+# 测试依赖包
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-html==4.1.1
+pytest-xdist==3.5.0  # 并行测试
+requests==2.31.0
+playwright==1.41.0  # 前端UI测试
+
+# 可选：测试报告美化
+pytest-cov==4.1.0
+allure-pytest==2.13.2
+

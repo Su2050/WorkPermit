@@ -1,0 +1,71 @@
+<!--pages/profile/index.wxml-->
+<view class="page">
+  <!-- 未登录状态 -->
+  <view wx:if="{{!isLoggedIn}}" class="not-logged-in container">
+    <view class="empty-state">
+      <image class="empty-icon" src="/assets/images/profile.png" mode="aspectFit" />
+      <text class="empty-text">请先登录</text>
+    </view>
+    <button class="btn btn-primary btn-block" bindtap="goLogin">
+      立即登录
+    </button>
+  </view>
+
+  <!-- 已登录状态 -->
+  <view wx:else class="container">
+    <!-- 用户信息卡片 -->
+    <view class="user-card card">
+      <view class="user-avatar">
+        <text class="avatar-text">{{workerInfo.name[0] || 'U'}}</text>
+      </view>
+      <view class="user-info">
+        <text class="user-name">{{workerInfo.name}}</text>
+        <text class="user-contractor">{{workerInfo.contractor_name}}</text>
+      </view>
+    </view>
+
+    <!-- 统计卡片 -->
+    <view class="stats-card card">
+      <view class="stat-item">
+        <text class="stat-value">{{stats.totalTrainings}}</text>
+        <text class="stat-label">培训总数</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value text-success">{{stats.completedTrainings}}</text>
+        <text class="stat-label">完成数量</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.totalWatchTime}}</text>
+        <text class="stat-label">学习时长(分)</text>
+      </view>
+    </view>
+
+    <!-- 菜单列表 -->
+    <view class="menu-card card">
+      <view class="menu-item" bindtap="goHistory">
+        <view class="menu-left">
+          <text class="menu-icon">📚</text>
+          <text class="menu-text">培训历史</text>
+        </view>
+        <text class="menu-arrow">›</text>
+      </view>
+      
+      <view class="menu-item" bindtap="goNotifications">
+        <view class="menu-left">
+          <text class="menu-icon">🔔</text>
+          <text class="menu-text">消息通知</text>
+        </view>
+        <view class="menu-right">
+          <view wx:if="{{unreadCount}}" class="badge">{{unreadCount}}</view>
+          <text class="menu-arrow">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 退出登录 -->
+    <button class="btn btn-secondary btn-block logout-btn" bindtap="logout">
+      退出登录
+    </button>
+  </view>
+</view>
+
