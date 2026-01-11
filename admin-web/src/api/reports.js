@@ -1,6 +1,11 @@
 import request from './request'
 
 export const reportsApi = {
+  // 获取看板数据
+  getDashboard(params) {
+    return request.get('/admin/reports/dashboard', { params })
+  },
+  
   // 获取培训统计
   getTrainingStats(params) {
     return request.get('/admin/reports/training-stats', { params })
