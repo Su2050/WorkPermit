@@ -85,8 +85,19 @@ class TicketChangeValidator:
                 code="VIDEO_REMOVAL_FORBIDDEN"
             ))
         
-        # 2. 移除人员检查（当天已完成禁止）
+        # 2. 移除人员检查
         if changes.remove_workers:
+            # 2.1 检查移除后是否还有人员（至少保留1人）
+            current_active = await self._count_active_workers(db_session, ticket.ticket_id)
+            remaining = current_active - len(changes.remove_workers) + len(changes.add_workers)
+            if remaining <= 0:
+                errors.append(ValidationError(
+                    field="remove_workers",
+                    message="作业票至少需要保留一名人员",
+                    code="MIN_WORKER_REQUIRED"
+                ))
+            
+            # 2.2 当天已完成培训者禁止移除
             for worker_id in changes.remove_workers:
                 completed_today = await self._check_worker_completed_today(
                     db_session, ticket.ticket_id, worker_id, today
@@ -127,6 +138,25 @@ class TicketChangeValidator:
         # 由于日期范围在 TicketChanges 中没有定义，这个检查在 API 层处理
         
         return errors
+    
+    async def _count_active_workers(
+        self,
+        db_session: Any,
+        ticket_id: uuid.UUID
+    ) -> int:
+        """统计作业票当前活跃人员数量"""
+        from sqlalchemy import select, func
+        from app.models import WorkTicketWorker
+        
+        result = await db_session.execute(
+            select(func.count())
+            .select_from(WorkTicketWorker)
+            .where(
+                WorkTicketWorker.ticket_id == ticket_id,
+                WorkTicketWorker.status == "ACTIVE"
+            )
+        )
+        return result.scalar() or 0
     
     async def _check_worker_completed_today(
         self, 
