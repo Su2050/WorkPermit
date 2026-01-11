@@ -21,10 +21,8 @@ export const ticketsApi = {
     return request.patch(`/admin/work-tickets/${id}`, data)
   },
   
-  // 变更作业票（补偿式）
-  applyChanges(id, changes) {
-    return request.post(`/admin/work-tickets/${id}/changes`, changes)
-  },
+  // 注意: 变更作业票请使用 update(id, data) 方法，通过 PATCH 请求
+  // applyChanges 已废弃，后端没有 /changes 路由
   
   // 发布作业票
   publish(id) {

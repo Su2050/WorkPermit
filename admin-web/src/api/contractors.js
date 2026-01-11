@@ -18,7 +18,7 @@ export const contractorsApi = {
   
   // 更新施工单位
   update(id, data) {
-    return request.put(`/admin/contractors/${id}`, data)
+    return request.patch(`/admin/contractors/${id}`, data)
   },
   
   // 删除施工单位
