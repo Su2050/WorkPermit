@@ -109,8 +109,19 @@ class TicketChangeValidator:
                         code="WORKER_COMPLETED_TODAY"
                     ))
         
-        # 3. 移除区域检查（当天已有授权禁止）
+        # 3. 移除区域检查
         if changes.remove_areas:
+            # 3.1 检查移除后是否还有区域（至少保留1个）
+            current_areas = await self._count_active_areas(db_session, ticket.ticket_id)
+            remaining_areas = current_areas - len(changes.remove_areas) + len(changes.add_areas)
+            if remaining_areas <= 0:
+                errors.append(ValidationError(
+                    field="remove_areas",
+                    message="作业票至少需要保留一个作业区域",
+                    code="MIN_AREA_REQUIRED"
+                ))
+            
+            # 3.2 当天已有授权的区域禁止移除
             for area_id in changes.remove_areas:
                 has_grant_today = await self._check_area_has_grant_today(
                     db_session, ticket.ticket_id, area_id, today
@@ -154,6 +165,25 @@ class TicketChangeValidator:
             .where(
                 WorkTicketWorker.ticket_id == ticket_id,
                 WorkTicketWorker.status == "ACTIVE"
+            )
+        )
+        return result.scalar() or 0
+    
+    async def _count_active_areas(
+        self,
+        db_session: Any,
+        ticket_id: uuid.UUID
+    ) -> int:
+        """统计作业票当前活跃区域数量"""
+        from sqlalchemy import select, func
+        from app.models import WorkTicketArea
+        
+        result = await db_session.execute(
+            select(func.count())
+            .select_from(WorkTicketArea)
+            .where(
+                WorkTicketArea.ticket_id == ticket_id,
+                WorkTicketArea.status == "ACTIVE"
             )
         )
         return result.scalar() or 0

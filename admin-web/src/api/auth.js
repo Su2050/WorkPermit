@@ -14,11 +14,8 @@ export const authApi = {
   // 修改密码
   changePassword(data) {
     return request.post('/admin/auth/change-password', data)
-  },
-  
-  // 刷新token
-  refreshToken() {
-    return request.post('/admin/auth/refresh')
   }
+  
+  // 注意: refreshToken 已移除，后端没有对应路由
 }
 
