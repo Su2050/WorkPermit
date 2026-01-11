@@ -588,7 +588,7 @@ async function handleSubmitChange() {
         }
       }
       
-      const response = await ticketsApi.applyChanges(currentTicket.value.ticket_id, changes)
+      const response = await ticketsApi.update(currentTicket.value.ticket_id, changes)
       
       if (response.data?.code === 0) {
         ElMessage.success('变更申请已提交')
