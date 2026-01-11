@@ -192,8 +192,7 @@ const statCards = computed(() => [
     value: stats.value.activeTickets,
     icon: 'Tickets',
     iconBg: 'linear-gradient(135deg, #1e3a5f, #2d5a8a)',
-    trend: '+3',
-    trendType: 'up'
+    trend: null
   },
   {
     key: 'todayTrainings',
@@ -201,8 +200,7 @@ const statCards = computed(() => [
     value: stats.value.todayTrainings,
     icon: 'User',
     iconBg: 'linear-gradient(135deg, #2ea043, #46d160)',
-    trend: '+12%',
-    trendType: 'up'
+    trend: null
   },
   {
     key: 'accessGrants',
