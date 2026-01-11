@@ -208,7 +208,7 @@ async function fetchList() {
     }
   } catch (error) {
     console.error('Failed to fetch sites:', error)
-    ElMessage.error('获取数据失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   } finally {
     loading.value = false
   }
@@ -229,11 +229,12 @@ async function handleToggleActive(row, val) {
       ElMessage.success('状态已更新')
     } else {
       row.is_active = prev
-      ElMessage.error(resp.data?.message || '状态更新失败')
+      // 注意: 响应拦截器已显示错误信息
     }
   } catch (e) {
     // 取消/失败都回滚 UI 状态
     row.is_active = prev
+    // 响应拦截器已处理错误显示
   } finally {
     togglingSiteId.value = ''
   }
@@ -269,7 +270,7 @@ function handleEdit(row) {
     }
   }).catch(error => {
     console.error('Failed to fetch site detail:', error)
-    ElMessage.error('获取工地详情失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   })
 }
 
@@ -334,12 +335,11 @@ async function handleSubmit() {
         ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
         dialogVisible.value = false
         await fetchList()
-      } else {
-        ElMessage.error(response.data?.message || '操作失败')
       }
+      // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
     } catch (error) {
       console.error('Failed to save site:', error)
-      ElMessage.error('操作失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     } finally {
       submitting.value = false
     }

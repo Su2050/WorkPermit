@@ -234,7 +234,7 @@ async function fetchWorkerInfo() {
     }
   } catch (error) {
     console.error('Failed to fetch worker info:', error)
-    ElMessage.error('获取工人信息失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   } finally {
     loading.value = false
   }

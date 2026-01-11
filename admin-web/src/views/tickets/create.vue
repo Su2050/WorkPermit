@@ -509,9 +509,10 @@ async function handleSubmit() {
         ElMessage.success('作业票创建成功')
         router.push('/tickets')
       }
+      // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
     } catch (error) {
       console.error('Failed to create ticket:', error)
-      ElMessage.error('创建失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     } finally {
       submitting.value = false
     }

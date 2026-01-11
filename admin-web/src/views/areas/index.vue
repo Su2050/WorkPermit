@@ -150,7 +150,7 @@ async function fetchList() {
     }
   } catch (error) {
     console.error('Failed to fetch areas:', error)
-    ElMessage.error('获取数据失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   } finally {
     loading.value = false
   }
@@ -165,7 +165,7 @@ async function fetchSiteOptions() {
     }
   } catch (error) {
     console.error('Failed to fetch site options:', error)
-    ElMessage.error('获取工地列表失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   }
 }
 
@@ -248,12 +248,11 @@ async function handleSubmit() {
         ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
         dialogVisible.value = false
         await fetchList()
-      } else {
-        ElMessage.error(response.data?.message || '操作失败')
       }
+      // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
     } catch (error) {
       console.error('Failed to save area:', error)
-      ElMessage.error('操作失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     } finally {
       submitting.value = false
     }
@@ -266,12 +265,11 @@ async function handleDelete(row) {
     if (response.data?.code === 0) {
       ElMessage.success('删除成功')
       await fetchList()
-    } else {
-      ElMessage.error(response.data?.message || '删除失败')
     }
+    // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
   } catch (error) {
     console.error('Failed to delete area:', error)
-    ElMessage.error('删除失败，请重试')
+    // 响应拦截器已处理错误显示，这里只记录日志
   }
 }
 

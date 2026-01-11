@@ -220,7 +220,7 @@ async function fetchGrants() {
     }
   } catch (error) {
     console.error('Failed to fetch grants:', error)
-    ElMessage.error('获取授权列表失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   } finally {
     loading.value = false
   }

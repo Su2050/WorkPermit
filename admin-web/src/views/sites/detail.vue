@@ -110,12 +110,12 @@ async function fetchDetail() {
     if (response.data?.code === 0) {
       Object.assign(site, response.data.data)
     } else {
-      ElMessage.error(response.data?.message || '获取工地详情失败')
+      // 注意: 响应拦截器已显示错误信息
       router.back()
     }
   } catch (error) {
     console.error('Failed to fetch site detail:', error)
-    ElMessage.error('获取工地详情失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
     router.back()
   } finally {
     loading.value = false

@@ -169,7 +169,7 @@ async function fetchList() {
     }
   } catch (error) {
     console.error('Failed to fetch videos:', error)
-    ElMessage.error('获取数据失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   } finally {
     loading.value = false
   }
@@ -289,12 +289,11 @@ async function handleSubmit() {
         ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
         dialogVisible.value = false
         await fetchList()
-      } else {
-        ElMessage.error(response.data?.message || '操作失败')
       }
+      // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
     } catch (error) {
       console.error('Failed to save video:', error)
-      ElMessage.error('操作失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     } finally {
       submitting.value = false
     }
@@ -311,13 +310,12 @@ async function handleDelete(row) {
     if (response.data?.code === 0) {
       ElMessage.success('删除成功')
       await fetchList()
-    } else {
-      ElMessage.error(response.data?.message || '删除失败')
     }
+    // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Failed to delete video:', error)
-      ElMessage.error('删除失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     }
   }
 }

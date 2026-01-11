@@ -78,6 +78,18 @@ request.interceptors.response.use(
     // HTTP 错误处理
     if (error.response) {
       const status = error.response.status
+      const res = error.response.data
+      
+      // 优先显示后端返回的详细错误信息（如果有）
+      let errorMessage = null
+      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        const firstError = res.data[0]
+        if (firstError.message) {
+          errorMessage = firstError.message
+        }
+      } else if (res && res.message) {
+        errorMessage = res.message
+      }
       
       switch (status) {
         case 401:
@@ -86,16 +98,16 @@ request.interceptors.response.use(
           router.push({ name: 'Login' })
           break
         case 403:
-          ElMessage.error('没有权限访问')
+          ElMessage.error(errorMessage || '没有权限访问')
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          ElMessage.error(errorMessage || '请求的资源不存在')
           break
         case 500:
-          ElMessage.error('服务器内部错误')
+          ElMessage.error(errorMessage || '服务器内部错误')
           break
         default:
-          ElMessage.error(`请求失败: ${status}`)
+          ElMessage.error(errorMessage || `请求失败: ${status}`)
       }
     } else if (error.message.includes('timeout')) {
       ElMessage.error('请求超时，请稍后重试')

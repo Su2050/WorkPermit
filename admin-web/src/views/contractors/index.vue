@@ -153,7 +153,7 @@ async function fetchList() {
     }
   } catch (error) {
     console.error('Failed to fetch contractors:', error)
-    ElMessage.error('获取数据失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   } finally {
     loading.value = false
   }
@@ -226,11 +226,20 @@ async function handleSubmit() {
         dialogVisible.value = false
         await fetchList()
       } else {
+        // 特殊处理：检查是否是"没有工地"的错误，需要引导用户创建工地
         const errorMessage = response.data?.message || '操作失败'
+        const errorDetails = response.data?.data || []
+        let finalMessage = errorMessage
+        
+        // 优先使用详细错误信息
+        if (errorDetails.length > 0 && errorDetails[0].message) {
+          finalMessage = errorDetails[0].message
+        }
+        
         // 检查是否是"没有工地"的错误
-        if (errorMessage.includes('没有工地') || errorMessage.includes('请先创建工地')) {
+        if (finalMessage.includes('没有工地') || finalMessage.includes('请先创建工地')) {
           ElMessageBox.confirm(
-            errorMessage + '，是否前往创建工地？',
+            finalMessage + '，是否前往创建工地？',
             '提示',
             {
               confirmButtonText: '去创建工地',
@@ -242,13 +251,12 @@ async function handleSubmit() {
           }).catch(() => {
             // 用户取消，不做任何操作
           })
-        } else {
-          ElMessage.error(errorMessage)
         }
+        // 注意: 其他错误由响应拦截器统一显示
       }
     } catch (error) {
       console.error('Failed to save contractor:', error)
-      ElMessage.error('操作失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     } finally {
       submitting.value = false
     }

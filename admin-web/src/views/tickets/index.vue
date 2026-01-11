@@ -487,15 +487,11 @@ async function handleSearch() {
     if (response.data?.code === 0) {
       tableData.value = response.data.data.items || []
       pagination.total = response.data.data.total || 0
-    } else {
-      // API返回错误
-      ElMessage.error(response.data?.message || '获取作业票列表失败')
-      tableData.value = []
-      pagination.total = 0
     }
+    // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
   } catch (error) {
     console.error('Failed to fetch tickets:', error)
-    ElMessage.error('网络错误，请稍后重试')
+    // 响应拦截器已处理错误显示，这里只记录日志
     tableData.value = []
     pagination.total = 0
   } finally {
@@ -619,9 +615,10 @@ async function handleClose(row) {
       ElMessage.success('作业票已关闭')
       handleSearch()
     }
+    // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
   } catch (error) {
     console.error('Failed to close ticket:', error)
-    ElMessage.error('关闭失败，请重试')
+    // 响应拦截器已处理错误显示，这里只记录日志
   }
 }
 
@@ -654,7 +651,7 @@ async function handleBatchClose() {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Failed to batch close:', error)
-      ElMessage.error('批量关闭失败')
+      // 响应拦截器已处理错误显示，这里只记录日志
     }
   }
 }
@@ -688,7 +685,7 @@ async function handleBatchCancel() {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Failed to batch cancel:', error)
-      ElMessage.error('批量取消失败')
+      // 响应拦截器已处理错误显示，这里只记录日志
     }
   }
 }
@@ -716,7 +713,7 @@ async function handleBatchExport() {
     ElMessage.success('导出成功')
   } catch (error) {
     console.error('Failed to export:', error)
-    ElMessage.error('导出失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
   }
 }
 

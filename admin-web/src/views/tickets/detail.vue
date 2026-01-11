@@ -697,7 +697,7 @@ async function fetchDailyTicket() {
     }
   } catch (error) {
     console.error('Failed to fetch daily ticket:', error)
-    ElMessage.error('获取每日票据失败')
+    // 响应拦截器已处理错误显示，这里只记录日志
     dailyTicket.value = null
     dailyWorkers.value = []
     dailyExpanded.value = false
@@ -825,13 +825,12 @@ async function handlePublish() {
     if (response.data?.code === 0) {
       ElMessage.success('发布成功')
       await fetchTicketDetail()
-    } else {
-      ElMessage.error(response.data?.message || '发布失败')
     }
+    // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Failed to publish ticket:', error)
-      ElMessage.error('发布失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     }
   }
 }
@@ -863,13 +862,12 @@ async function handleCancel() {
     if (response.data?.code === 0) {
       ElMessage.success('取消成功')
       await fetchTicketDetail()
-    } else {
-      ElMessage.error(response.data?.message || '取消失败')
     }
+    // 注意: 如果 code !== 0，响应拦截器会自动显示错误信息
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Failed to cancel ticket:', error)
-      ElMessage.error('取消失败，请重试')
+      // 响应拦截器已处理错误显示，这里只记录日志
     }
   }
 }
