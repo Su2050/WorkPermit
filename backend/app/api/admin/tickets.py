@@ -794,15 +794,14 @@ async def get_ticket_stats(
     result = await db.execute(stmt)
     tickets = result.scalars().all()
     
-    # 统计各状态数量
+    # 统计各状态数量（WorkTicket 状态: DRAFT/ACTIVE/CANCELLED）
     total_count = len(tickets)
     draft_count = sum(1 for t in tickets if t.status == "DRAFT")
-    in_progress_count = sum(1 for t in tickets if t.status == "IN_PROGRESS")
-    closed_count = sum(1 for t in tickets if t.status == "CLOSED")
+    active_count = sum(1 for t in tickets if t.status == "ACTIVE")
     cancelled_count = sum(1 for t in tickets if t.status == "CANCELLED")
     
-    # 计算完成率
-    completion_rate = round((closed_count / total_count * 100), 2) if total_count > 0 else 0
+    # 计算活跃率
+    active_rate = round((active_count / total_count * 100), 2) if total_count > 0 else 0
     
     # 统计人员数量
     total_workers = 0
@@ -827,10 +826,9 @@ async def get_ticket_stats(
     return success_response({
         "total_count": total_count,
         "draft_count": draft_count,
-        "in_progress_count": in_progress_count,
-        "closed_count": closed_count,
+        "active_count": active_count,
         "cancelled_count": cancelled_count,
-        "completion_rate": completion_rate,
+        "active_rate": active_rate,
         "total_workers": total_workers,
         "total_areas": total_areas,
         "start_date": str(start_date) if start_date else None,

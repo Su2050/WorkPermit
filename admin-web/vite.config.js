@@ -26,6 +26,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',  // 允许局域网访问
     port: 5173,
+    strictPort: true,  // 如果端口被占用则退出，而不是尝试下一个可用端口
+    hmr: {
+      host: '0.0.0.0',  // HMR也监听所有接口
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

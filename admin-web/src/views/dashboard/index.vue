@@ -334,8 +334,21 @@ function initStatusChart() {
   if (!statusChartRef.value) return
   
   statusChart = echarts.init(statusChartRef.value)
+  updateStatusChart()
+}
+
+// 更新状态图数据
+function updateStatusChart() {
+  if (!statusChart) return
   
-  const option = {
+  const chartData = [
+    { value: statusItems.value.find(i => i.key === 'notStarted')?.count || 0, name: '未开始', itemStyle: { color: '#6e7681' } },
+    { value: statusItems.value.find(i => i.key === 'inProgress')?.count || 0, name: '进行中', itemStyle: { color: '#58a6ff' } },
+    { value: statusItems.value.find(i => i.key === 'completed')?.count || 0, name: '已完成', itemStyle: { color: '#2ea043' } },
+    { value: statusItems.value.find(i => i.key === 'failed')?.count || 0, name: '异常', itemStyle: { color: '#f85149' } }
+  ]
+  
+  statusChart.setOption({
     tooltip: {
       trigger: 'item',
       backgroundColor: 'rgba(22, 27, 34, 0.95)',
@@ -349,17 +362,10 @@ function initStatusChart() {
         center: ['50%', '50%'],
         avoidLabelOverlap: false,
         label: { show: false },
-        data: [
-          { value: 10, name: '未开始', itemStyle: { color: '#6e7681' } },
-          { value: 25, name: '进行中', itemStyle: { color: '#58a6ff' } },
-          { value: 60, name: '已完成', itemStyle: { color: '#2ea043' } },
-          { value: 5, name: '异常', itemStyle: { color: '#f85149' } }
-        ]
+        data: chartData
       }
     ]
-  }
-  
-  statusChart.setOption(option)
+  })
 }
 
 // 获取看板数据
@@ -369,6 +375,15 @@ async function fetchDashboardStats() {
     if (response.data?.code === 0) {
       const data = response.data.data
       stats.value = data.stats || stats.value
+      
+      // 更新今日作业状态
+      if (data.todayStatus) {
+        statusItems.value.forEach(item => {
+          item.count = data.todayStatus[item.key] || 0
+        })
+        // 更新饼图
+        updateStatusChart()
+      }
     }
   } catch (error) {
     console.error('Failed to fetch dashboard stats:', error)
@@ -391,6 +406,14 @@ async function fetchDashboardDetails() {
       const data = response.data.data
       pendingTickets.value = data.pendingTickets || []
       recentAlerts.value = data.recentAlerts || []
+      
+      // 更新今日作业状态（如果详情接口也返回了状态数据）
+      if (data.todayStatus) {
+        statusItems.value.forEach(item => {
+          item.count = data.todayStatus[item.key] || 0
+        })
+        updateStatusChart()
+      }
     }
   } catch (error) {
     console.error('Failed to fetch dashboard details:', error)
@@ -533,7 +556,7 @@ watch(chartRange, () => {
   
   .stat-label {
     font-size: 13px;
-    color: var(--text-secondary);
+    color: var(--text-primary);
   }
   
   .stat-value {
@@ -579,10 +602,11 @@ watch(chartRange, () => {
     justify-content: space-between;
     align-items: center;
     
-    span {
+    > span {
       font-size: 15px;
-      font-weight: 500;
-      color: var(--text-primary);
+      font-weight: 700;
+      /* 跟作业票详情页一致：用 Element Plus 的文本色，避免白底下自定义浅色不可读 */
+      color: var(--el-text-color-primary) !important;
     }
   }
 }
@@ -651,10 +675,10 @@ watch(chartRange, () => {
     justify-content: space-between;
     align-items: center;
     
-    span {
+    > span {
       font-size: 15px;
-      font-weight: 500;
-      color: var(--text-primary);
+      font-weight: 700;
+      color: var(--el-text-color-primary) !important;
     }
   }
   

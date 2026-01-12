@@ -164,19 +164,38 @@ async def get_dashboard(
     total_grants = synced_grants + pending_grants
     sync_rate = round(synced_grants / total_grants * 100, 1) if total_grants > 0 else 0
     
-    # 获取进行中的作业票数量
+    # 统计今日作业状态（按 DailyTicket 状态分组统计）
+    stmt = select(
+        DailyTicket.status,
+        func.count(DailyTicket.daily_ticket_id)
+    ).where(
+        DailyTicket.date == today
+    ).group_by(DailyTicket.status)
+    stmt = TenantQueryFilter.apply(stmt, ctx)
+    status_result = await db.execute(stmt)
+    status_counts = {row[0]: row[1] for row in status_result.all()}
+    
+    # 映射状态到前端需要的格式
+    today_status = {
+        "notStarted": status_counts.get("DRAFT", 0) + status_counts.get("PUBLISHED", 0),
+        "inProgress": status_counts.get("IN_PROGRESS", 0),
+        "completed": status_counts.get("EXPIRED", 0),
+        "failed": status_counts.get("CANCELLED", 0)
+    }
+    
+    # 获取进行中的作业票数量（ACTIVE 状态表示已发布正在进行中）
     stmt = select(func.count(WorkTicket.ticket_id)).where(
-        WorkTicket.status == "IN_PROGRESS"
+        WorkTicket.status == "ACTIVE"
     )
     stmt = TenantQueryFilter.apply(stmt, ctx)
     active_tickets_result = await db.execute(stmt)
     active_tickets = active_tickets_result.scalar() or 0
     
-    # 获取待处理作业票（今日进行中且培训未完成的）
+    # 获取待处理作业票（已发布且正在进行中的）
     stmt = select(WorkTicket).options(
         selectinload(WorkTicket.contractor)
     ).where(
-        WorkTicket.status == "IN_PROGRESS"
+        WorkTicket.status == "ACTIVE"
     ).order_by(WorkTicket.created_at.desc()).limit(5)
     stmt = TenantQueryFilter.apply(stmt, ctx)
     pending_tickets_result = await db.execute(stmt)
@@ -239,6 +258,7 @@ async def get_dashboard(
             "accessGrants": synced_grants,
             "syncRate": sync_rate
         },
+        "todayStatus": today_status,
         "pendingTickets": pending_tickets_list,
         "recentAlerts": []  # 暂时返回空数组，后续可以添加告警数据
     }
@@ -317,13 +337,32 @@ async def get_dashboard_stats(
     total_grants = synced_grants + pending_grants
     sync_rate = round(synced_grants / total_grants * 100, 1) if total_grants > 0 else 0
 
-    # 进行中的作业票数量
+    # 进行中的作业票数量（ACTIVE 状态表示已发布正在进行中）
     stmt = select(func.count(WorkTicket.ticket_id)).where(
-        WorkTicket.status == "IN_PROGRESS"
+        WorkTicket.status == "ACTIVE"
     )
     stmt = TenantQueryFilter.apply(stmt, ctx)
     active_tickets_result = await db.execute(stmt)
     active_tickets = active_tickets_result.scalar() or 0
+
+    # 统计今日作业状态（按 DailyTicket 状态分组统计）
+    stmt = select(
+        DailyTicket.status,
+        func.count(DailyTicket.daily_ticket_id)
+    ).where(
+        DailyTicket.date == today
+    ).group_by(DailyTicket.status)
+    stmt = TenantQueryFilter.apply(stmt, ctx)
+    status_result = await db.execute(stmt)
+    status_counts = {row[0]: row[1] for row in status_result.all()}
+    
+    # 映射状态到前端需要的格式
+    today_status = {
+        "notStarted": status_counts.get("DRAFT", 0) + status_counts.get("PUBLISHED", 0),
+        "inProgress": status_counts.get("IN_PROGRESS", 0),
+        "completed": status_counts.get("EXPIRED", 0),
+        "failed": status_counts.get("CANCELLED", 0)
+    }
 
     payload = {
         "stats": {
@@ -332,7 +371,8 @@ async def get_dashboard_stats(
             "todayTrainings": completed_training,
             "accessGrants": synced_grants,
             "syncRate": sync_rate
-        }
+        },
+        "todayStatus": today_status
     }
 
     if redis_client is not None:
